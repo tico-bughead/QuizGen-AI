@@ -300,42 +300,23 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                         Estilo de Ensino
                         <Tooltip id="teachingStyle" text="Define a personalidade da IA ao criar perguntas e explicações." />
                     </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setTeachingStyle('standard')}
-                            className={`p-2 text-xs rounded-2xl border transition-all ${teachingStyle === 'standard' ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-1 ring-indigo-500' : 'bg-white border-slate-200 text-slate-500'}`}
+                    <div className="relative">
+                        <select
+                            value={teachingStyle}
+                            onChange={(e) => setTeachingStyle(e.target.value as TeachingStyle)}
+                            className="w-full appearance-none bg-white border border-slate-200 text-slate-700 py-3 px-4 pr-8 rounded-2xl leading-tight focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 transition-all"
                         >
-                            Padrão
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setTeachingStyle('socratic')}
-                            className={`p-2 text-xs rounded-2xl border transition-all ${teachingStyle === 'socratic' ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-1 ring-indigo-500' : 'bg-white border-slate-200 text-slate-500'}`}
-                        >
-                            Socrático
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setTeachingStyle('humorous')}
-                            className={`p-2 text-xs rounded-2xl border transition-all ${teachingStyle === 'humorous' ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-1 ring-indigo-500' : 'bg-white border-slate-200 text-slate-500'}`}
-                        >
-                            Bem-humorado
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setTeachingStyle('strict')}
-                            className={`p-2 text-xs rounded-2xl border transition-all ${teachingStyle === 'strict' ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-1 ring-indigo-500' : 'bg-white border-slate-200 text-slate-500'}`}
-                        >
-                            Rigoroso
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setTeachingStyle('gamified')}
-                            className={`p-2 text-xs rounded-2xl border transition-all ${teachingStyle === 'gamified' ? 'bg-indigo-50 border-indigo-500 text-indigo-700 ring-1 ring-indigo-500' : 'bg-white border-slate-200 text-slate-500'}`}
-                        >
-                            Gamificado
-                        </button>
+                            <option value="standard">Padrão</option>
+                            <option value="socratic">Socrático</option>
+                            <option value="humorous">Bem-humorado</option>
+                            <option value="strict">Rigoroso</option>
+                            <option value="gamified">Gamificado</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                            </svg>
+                        </div>
                     </div>
                 </div>
 
