@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { QuizData, UserAnswers, Difficulty, QuizTheme, Question, MatchingPair, EssayEvaluation } from '../types';
 import { Button } from './Button';
-import { ChevronRight, CheckCircle2, Timer, AlertCircle, XCircle, Volume2, VolumeX, SkipForward, Heart, Zap, Shield, Hourglass, Trophy, PenTool, Loader2 } from 'lucide-react';
+import { ChevronRight, CheckCircle2, Timer, AlertCircle, XCircle, Volume2, VolumeX, SkipForward, Heart, Zap, Shield, Hourglass, Trophy, PenTool, Loader2, Download } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 
 interface QuizGameProps {
   quiz: QuizData;
@@ -77,6 +78,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   const totalQuestions = quiz.questions.length;
 
   const getQuestionTimeLimit = () => {
+      if (quiz.gameMode === 'training') return 9999; // Effectively infinite
       if (quiz.gameMode === 'speed_run') return 60;
       if (question.type === 'ESSAY') return 300; // 5 minutes for essay
       return TIME_LIMITS[quiz.difficulty];
@@ -1014,21 +1016,25 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
         {/* Header Info */}
         <div className="flex items-center justify-between mb-4">
           <span className={`${styles.textSec} text-xs sm:text-sm font-medium uppercase tracking-wider truncate mr-4`}>
-             {quiz.topic}
+             {quiz.topic} {quiz.gameMode === 'training' && <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-[10px] ml-2">Modo Treino</span>}
           </span>
-          <span className={`flex items-center gap-2 font-mono font-bold text-xl sm:text-2xl ${timerColor} transition-colors flex-shrink-0 ${isFrozen ? 'animate-pulse text-blue-400' : ''}`}>
-            {isFrozen ? <Hourglass className="w-5 h-5" /> : <Timer className="w-5 h-5" />}
-            {timeLeft}s
-          </span>
+          {quiz.gameMode !== 'training' && (
+            <span className={`flex items-center gap-2 font-mono font-bold text-xl sm:text-2xl ${timerColor} transition-colors flex-shrink-0 ${isFrozen ? 'animate-pulse text-blue-400' : ''}`}>
+                {isFrozen ? <Hourglass className="w-5 h-5" /> : <Timer className="w-5 h-5" />}
+                {timeLeft}s
+            </span>
+          )}
         </div>
 
-        {/* Timer Bar */}
-        <div className={`w-full ${styles.progressBg} rounded-full h-2 mb-6 sm:mb-8 overflow-hidden`}>
-          <div 
-            className={`h-full rounded-full transition-all duration-1000 ease-linear ${barColor}`}
-            style={{ width: `${timePercentage}%` }}
-          />
-        </div>
+        {/* Timer Bar - Hide in Training Mode */}
+        {quiz.gameMode !== 'training' && (
+            <div className={`w-full ${styles.progressBg} rounded-full h-2 mb-6 sm:mb-8 overflow-hidden`}>
+            <div 
+                className={`h-full rounded-full transition-all duration-1000 ease-linear ${barColor}`}
+                style={{ width: `${timePercentage}%` }}
+            />
+            </div>
+        )}
 
         {/* Card */}
         <div className={`${styles.card} ${isTimeout ? styles.cardTimeUp : ''} rounded-[2.5rem] p-4 sm:p-6 md:p-10 relative overflow-hidden transition-all duration-300 flex flex-col`}>
@@ -1110,6 +1116,36 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                 </div>
             ) : question.type === 'ESSAY' ? (
                 <div className="w-full space-y-4">
+                    <div className="flex justify-end">
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => {
+                                const doc = new jsPDF();
+                                doc.setFontSize(16);
+                                doc.text("Folha de Redação", 105, 20, { align: "center" });
+                                doc.setFontSize(12);
+                                doc.text(`Tema: ${question.text}`, 20, 30);
+                                
+                                // Lines
+                                let y = 50;
+                                for (let i = 1; i <= 30; i++) {
+                                    doc.setDrawColor(200, 200, 200);
+                                    doc.line(20, y, 190, y);
+                                    doc.setFontSize(10);
+                                    doc.setTextColor(150, 150, 150);
+                                    doc.text(`${i}`, 15, y);
+                                    y += 8;
+                                }
+                                
+                                doc.save("folha_redacao.pdf");
+                            }}
+                            icon={<Download className="w-3 h-3" />}
+                            className="text-xs py-1 h-8 mb-2"
+                        >
+                            Baixar Folha de Redação
+                        </Button>
+                    </div>
                     <textarea
                         value={essayAnswer}
                         onChange={(e) => setEssayAnswer(e.target.value)}

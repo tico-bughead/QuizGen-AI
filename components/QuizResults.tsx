@@ -326,6 +326,84 @@ export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry
                                                                   <strong>Estrutura:</strong> {essayEvaluations[q.id].structureFeedback}
                                                               </div>
                                                           )}
+                                                          
+                                                          {/* Competencies Breakdown */}
+                                                          {essayEvaluations[q.id].competencies && (
+                                                              <div className="mt-4 space-y-2">
+                                                                  <h4 className="text-xs font-bold uppercase text-slate-500">Competências ENEM:</h4>
+                                                                  {essayEvaluations[q.id].competencies!.map((comp) => (
+                                                                      <div key={comp.id} className="text-xs bg-white p-2 rounded border border-slate-100">
+                                                                          <div className="flex justify-between font-bold text-slate-700 mb-1">
+                                                                              <span>{comp.id}. {comp.name}</span>
+                                                                              <span>{comp.score}/200</span>
+                                                                          </div>
+                                                                          <p className="text-slate-500">{comp.feedback}</p>
+                                                                      </div>
+                                                                  ))}
+                                                              </div>
+                                                          )}
+
+                                                          {/* Export Buttons for Essay */}
+                                                          <div className="flex gap-2 mt-4">
+                                                              <Button 
+                                                                  size="sm" 
+                                                                  variant="outline" 
+                                                                  onClick={() => {
+                                                                      const doc = new jsPDF();
+                                                                      doc.setFontSize(16);
+                                                                      doc.text("Folha de Redação", 105, 20, { align: "center" });
+                                                                      doc.setFontSize(12);
+                                                                      doc.text(`Tema: ${q.text}`, 20, 30);
+                                                                      
+                                                                      // Lines
+                                                                      let y = 50;
+                                                                      for (let i = 1; i <= 30; i++) {
+                                                                          doc.setDrawColor(200, 200, 200);
+                                                                          doc.line(20, y, 190, y);
+                                                                          doc.setFontSize(10);
+                                                                          doc.setTextColor(150, 150, 150);
+                                                                          doc.text(`${i}`, 15, y);
+                                                                          y += 8;
+                                                                      }
+                                                                      
+                                                                      doc.save("folha_redacao.pdf");
+                                                                  }}
+                                                                  icon={<Download className="w-3 h-3" />}
+                                                                  className="text-xs py-1 h-8"
+                                                              >
+                                                                  Baixar Folha
+                                                              </Button>
+                                                              
+                                                              {essayEvaluations[q.id].modelEssay && (
+                                                                  <Button 
+                                                                      size="sm" 
+                                                                      variant="outline" 
+                                                                      onClick={() => {
+                                                                          const doc = new jsPDF();
+                                                                          const pageWidth = doc.internal.pageSize.getWidth();
+                                                                          
+                                                                          doc.setFontSize(16);
+                                                                          doc.text("Redação Modelo (Nota 1000)", 105, 20, { align: "center" });
+                                                                          
+                                                                          doc.setFontSize(12);
+                                                                          doc.setFont("helvetica", "bold");
+                                                                          doc.text(`Tema: ${q.text}`, 20, 35);
+                                                                          
+                                                                          doc.setFont("helvetica", "normal");
+                                                                          doc.setFontSize(11);
+                                                                          
+                                                                          const splitText = doc.splitTextToSize(essayEvaluations[q.id].modelEssay!, pageWidth - 40);
+                                                                          doc.text(splitText, 20, 50);
+                                                                          
+                                                                          doc.save("redacao_modelo.pdf");
+                                                                      }}
+                                                                      icon={<CheckCircle className="w-3 h-3" />}
+                                                                      className="text-xs py-1 h-8"
+                                                                  >
+                                                                  Baixar Modelo
+                                                                  </Button>
+                                                              )}
+                                                          </div>
                                                       </div>
                                                   )}
                                               </div>

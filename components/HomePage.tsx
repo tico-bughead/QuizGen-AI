@@ -1,14 +1,15 @@
 import React from 'react';
 import { Button } from './Button';
-import { BrainCircuit, Sparkles, Gamepad2, Users, Trophy, ArrowRight } from 'lucide-react';
+import { BrainCircuit, Sparkles, Gamepad2, Users, Trophy, ArrowRight, PenTool } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface HomePageProps {
   onStart: () => void;
   onCreate: () => void;
+  onEssayGenerator: () => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate }) => {
+export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate, onEssayGenerator }) => {
   return (
     <div className="max-w-4xl mx-auto w-full">
       <div className="text-center mb-12">
@@ -36,7 +37,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate }) => {
           transition={{ delay: 0.3 }}
           className="text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto leading-relaxed"
         >
-          Transforme qualquer assunto em um jogo de perguntas e respostas desafiador em segundos.
+          Crie quizzes desafiadores sobre qualquer assunto ou aprimore sua escrita com nossa ferramenta completa de redação e feedback inteligente.
         </motion.p>
       </div>
 
@@ -51,7 +52,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate }) => {
             <Sparkles className="w-6 h-6" />
           </div>
           <h3 className="text-lg font-bold text-slate-800 mb-2">IA Generativa</h3>
-          <p className="text-slate-500">Crie quizzes únicos sobre qualquer tópico imaginável, de História a Cultura Pop.</p>
+          <p className="text-slate-500">Gere quizzes únicos e temas de redação sobre qualquer tópico, de História a Cultura Pop.</p>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-xl border border-slate-100 hover:shadow-2xl transition-shadow">
@@ -59,7 +60,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate }) => {
             <Gamepad2 className="w-6 h-6" />
           </div>
           <h3 className="text-lg font-bold text-slate-800 mb-2">Modos de Jogo</h3>
-          <p className="text-slate-500">Divirta-se com modos Arcade, TV Show, Speed Run e muito mais.</p>
+          <p className="text-slate-500">Divirta-se com modos Arcade, TV Show ou pratique com o modo Redação e Treino.</p>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-xl border border-slate-100 hover:shadow-2xl transition-shadow">
@@ -91,6 +92,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate }) => {
           icon={<BrainCircuit className="w-6 h-6" />}
         >
           Criar Quiz
+        </Button>
+        <Button 
+          onClick={onEssayGenerator} 
+          variant="outline"
+          className="py-4 px-12 text-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 shadow-lg"
+          icon={<PenTool className="w-6 h-6" />}
+        >
+          Modelos de Redação
         </Button>
       </motion.div>
     </div>

@@ -259,12 +259,12 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
 
                         <button
                             type="button"
-                            onClick={() => setGameMode('essay_challenge')}
-                            className={`aspect-square flex flex-col items-center justify-center p-4 rounded-[2rem] border transition-all ${gameMode === 'essay_challenge' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-slate-200 hover:border-slate-300'}`}
+                            onClick={() => setGameMode('training')}
+                            className={`aspect-square flex flex-col items-center justify-center p-4 rounded-[2rem] border transition-all ${gameMode === 'training' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-slate-200 hover:border-slate-300'}`}
                         >
                             <div className="flex flex-col items-center gap-2 text-center">
-                                <PenTool className={`w-8 h-8 ${gameMode === 'essay_challenge' ? 'text-indigo-600' : 'text-slate-500'}`} />
-                                <span className={`font-bold text-xs ${gameMode === 'essay_challenge' ? 'text-indigo-900' : 'text-slate-700'}`}>Redação</span>
+                                <GraduationCap className={`w-8 h-8 ${gameMode === 'training' ? 'text-indigo-600' : 'text-slate-500'}`} />
+                                <span className={`font-bold text-xs ${gameMode === 'training' ? 'text-indigo-900' : 'text-slate-700'}`}>Treino</span>
                             </div>
                         </button>
                     </div>

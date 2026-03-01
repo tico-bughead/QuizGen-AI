@@ -38,14 +38,20 @@ export const evaluateEssay = async (
     Resposta do aluno: "${userAnswer}"
     ${rubric ? `Rubrica de avaliação: ${rubric}` : ''}
 
-    Forneça uma avaliação construtiva e detalhada.
+    Forneça uma avaliação construtiva e detalhada, seguindo o padrão ENEM (Competências 1 a 5).
     Retorne um JSON com:
-    - score: nota de 0 a 100.
+    - score: nota geral de 0 a 1000 (padrão ENEM).
     - feedback: um parágrafo geral sobre a resposta.
     - strengths: lista de pontos fortes.
     - improvements: lista de pontos a melhorar.
-    - styleFeedback: sugestões específicas para melhorar o estilo de escrita (clareza, vocabulário, tom).
-    - structureFeedback: sugestões específicas para melhorar a estrutura (organização, parágrafos, fluxo).
+    - styleFeedback: sugestões específicas para melhorar o estilo de escrita.
+    - structureFeedback: sugestões específicas para melhorar a estrutura.
+    - competencies: array com 5 objetos, cada um contendo:
+        - id: número da competência (1 a 5).
+        - name: nome da competência (Use nomes claros como: "Gramática e Norma Culta", "Compreensão do Tema", "Argumentação e Organização", "Coesão Textual", "Proposta de Intervenção").
+        - score: nota na competência (0, 40, 80, 120, 160 ou 200).
+        - feedback: breve comentário sobre o desempenho nesta competência.
+    - modelEssay: gere um exemplo de redação nota 1000 sobre o mesmo tema para servir de modelo.
   `;
 
   try {
@@ -63,14 +69,43 @@ export const evaluateEssay = async (
             improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
             styleFeedback: { type: Type.STRING },
             structureFeedback: { type: Type.STRING },
+            competencies: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        id: { type: Type.INTEGER },
+                        name: { type: Type.STRING },
+                        score: { type: Type.INTEGER },
+                        feedback: { type: Type.STRING }
+                    },
+                    required: ["id", "name", "score", "feedback"]
+                }
+            },
+            modelEssay: { type: Type.STRING }
           },
-          required: ["score", "feedback", "strengths", "improvements"],
+          required: ["score", "feedback", "strengths", "improvements", "competencies", "modelEssay"],
         },
       },
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as EssayEvaluation;
+      const evaluation = JSON.parse(response.text) as EssayEvaluation;
+      // Normalize score to 0-100 for internal consistency if needed, or keep 0-1000 for display
+      // Let's keep 0-1000 for ENEM style if it's an essay, but the app expects 0-100 for progress bars.
+      // We'll map 0-1000 to 0-100 internally for the progress bar, but display the raw score.
+      // Actually, let's just return it as is and handle display in UI.
+      // Wait, the interface says score: number. If I change it to 1000, I need to make sure other parts handle it.
+      // The progress bar in QuizResults uses percentage calculation based on correct count, not raw score.
+      // But for the specific essay result card, it shows score/100. I should probably normalize it to 0-100 there or here.
+      // Let's normalize here to 0-100 for compatibility, but keep the competencies scores as is (0-200).
+      // Or better: update the UI to handle 0-1000 for essays.
+      // For now, I'll normalize the main score to 0-100 to avoid breaking the "passed" logic (>= 60).
+      // 600/1000 = 60/100.
+      if (evaluation.score > 100) {
+          evaluation.score = Math.round(evaluation.score / 10);
+      }
+      return evaluation;
     }
     throw new Error("Resposta vazia da IA na avaliação.");
   } catch (error) {
@@ -78,6 +113,58 @@ export const evaluateEssay = async (
     throw error;
   }
 };
+
+export const generateEssayModel = async (topic: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const model = "gemini-2.5-flash";
+
+  const prompt = `
+    Escreva uma redação modelo nota 1000 (padrão ENEM) sobre o tema: "${topic}".
+    A redação deve ter título, introdução, desenvolvimento (2 parágrafos) e conclusão com proposta de intervenção.
+    O texto deve ser coeso, coerente e demonstrar domínio da norma culta.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+    });
+
+    if (response.text) {
+      return response.text;
+    }
+    throw new Error("Resposta vazia da IA ao gerar modelo de redação.");
+  } catch (error) {
+    console.error("Erro ao gerar modelo de redação:", error);
+    throw error;
+  }
+};
+
+export const generateEssayTopic = async (): Promise<string> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const model = "gemini-2.5-flash";
+  
+    const prompt = `
+      Gere um tema de redação atual e relevante para o ENEM ou vestibulares.
+      Retorne APENAS o título do tema, sem aspas ou explicações.
+      Exemplo: "Os desafios da mobilidade urbana no Brasil"
+    `;
+  
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+      });
+  
+      if (response.text) {
+        return response.text.trim();
+      }
+      throw new Error("Resposta vazia da IA ao gerar tema.");
+    } catch (error) {
+      console.error("Erro ao gerar tema de redação:", error);
+      throw error;
+    }
+  };
 
 export const generateQuiz = async (
   config: QuizConfig
@@ -106,7 +193,13 @@ export const generateQuiz = async (
   }
 
   const effectiveQuestionCount = config.gameMode === 'speed_run' ? 20 : config.questionCount;
-  const speedRunInstruction = config.gameMode === 'speed_run' ? "As perguntas devem ser curtas e diretas para leitura rápida." : "";
+  
+  let modeInstruction = "";
+  if (config.gameMode === 'speed_run') {
+      modeInstruction = "As perguntas devem ser curtas e diretas para leitura rápida.";
+  } else if (config.gameMode === 'training') {
+      modeInstruction = "Foque em perguntas didáticas e fundamentais. As explicações devem ser detalhadas para facilitar o aprendizado.";
+  }
 
   let teachingStyleInstruction = "";
   switch (config.teachingStyle) {
@@ -180,7 +273,7 @@ export const generateQuiz = async (
     Quantidade de perguntas: ${effectiveQuestionCount}.
     Idioma: Português (Brasil).
     Modo de Jogo: ${config.gameMode}.
-    ${speedRunInstruction}
+    ${modeInstruction}
     Estilo de Ensino: ${teachingStyleInstruction}
     ${storyInstruction}
     

@@ -8,7 +8,7 @@ export type QuizTheme = 'light' | 'dark' | 'vibrant' | 'retro' | 'neon' | 'summe
 
 export type QuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'FILL_IN_THE_BLANK' | 'ESSAY';
 
-export type GameMode = 'classic' | 'arcade' | 'tv_show' | 'speed_run' | 'essay_challenge';
+export type GameMode = 'classic' | 'arcade' | 'tv_show' | 'speed_run' | 'essay_challenge' | 'training';
 
 export type ArcadeMap = 'overworld' | 'underground' | 'athletic' | 'boss';
 
@@ -22,12 +22,19 @@ export interface MatchingPair {
 }
 
 export interface EssayEvaluation {
-  score: number; // 0-100
+  score: number; // 0-100 (or 0-1000 for ENEM style, but we map to 0-100 for consistency)
   feedback: string;
   strengths: string[];
   improvements: string[];
   styleFeedback?: string;
   structureFeedback?: string;
+  competencies?: {
+      id: number;
+      name: string;
+      score: number; // 0-200
+      feedback: string;
+  }[];
+  modelEssay?: string; // Example essay for the topic
 }
 
 export interface Question {
@@ -60,7 +67,7 @@ export interface UserAnswers {
   [questionId: number]: any; // number (index) or MatchingPair[]
 }
 
-export type AppState = 'HOME' | 'SETUP' | 'CREATING' | 'LOADING' | 'QUIZ' | 'RESULTS' | 'CUTSCENE' | 'ERROR';
+export type AppState = 'HOME' | 'SETUP' | 'CREATING' | 'LOADING' | 'QUIZ' | 'RESULTS' | 'CUTSCENE' | 'ERROR' | 'ESSAY_GENERATOR';
 
 export interface QuizConfig {
   topic: string;

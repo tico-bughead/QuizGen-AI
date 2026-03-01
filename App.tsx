@@ -11,6 +11,8 @@ import { generateQuiz } from './services/geminiService';
 import { AlertCircle } from 'lucide-react';
 import { Button } from './components/Button';
 
+import { EssayTemplateGenerator } from './components/EssayTemplateGenerator';
+
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('HOME');
   const [quizData, setQuizData] = useState<QuizData | null>(null);
@@ -134,7 +136,11 @@ const App: React.FC = () => {
       <main className="w-full max-w-4xl flex-1 flex flex-col justify-center">
         
         {appState === 'HOME' && (
-          <HomePage onStart={() => setAppState('SETUP')} onCreate={handleCreateQuiz} />
+          <HomePage 
+            onStart={() => setAppState('SETUP')} 
+            onCreate={handleCreateQuiz} 
+            onEssayGenerator={() => setAppState('ESSAY_GENERATOR')}
+          />
         )}
 
         {appState === 'SETUP' && (
@@ -143,6 +149,10 @@ const App: React.FC = () => {
 
         {appState === 'CREATING' && (
           <QuizCreator onSave={handleSaveCreatedQuiz} onCancel={() => setAppState('HOME')} />
+        )}
+
+        {appState === 'ESSAY_GENERATOR' && (
+            <EssayTemplateGenerator onBack={() => setAppState('HOME')} />
         )}
 
         {appState === 'LOADING' && (
