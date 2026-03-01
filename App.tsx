@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppState, QuizConfig, QuizData, UserAnswers, ArcadeMap } from './types';
+import { AppState, QuizConfig, QuizData, UserAnswers, ArcadeMap, EssayEvaluation } from './types';
 import { QuizSetup } from './components/QuizSetup';
 import { HomePage } from './components/HomePage';
 import { QuizCreator } from './components/QuizCreator';
@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [userAnswers, setUserAnswers] = useState<UserAnswers>({});
   const [score, setScore] = useState<number | number[] | undefined>(undefined);
+  const [essayEvaluations, setEssayEvaluations] = useState<Record<number, EssayEvaluation>>({});
   const [error, setError] = useState<string | null>(null);
   const [currentTopic, setCurrentTopic] = useState<string>('');
 
@@ -61,9 +62,10 @@ const App: React.FC = () => {
     setAppState('QUIZ');
   };
 
-  const handleQuizComplete = async (answers: UserAnswers, finalScore?: number | number[]) => {
+  const handleQuizComplete = async (answers: UserAnswers, finalScore?: number | number[], evaluations?: Record<number, EssayEvaluation>) => {
     setUserAnswers(answers);
     setScore(finalScore);
+    if (evaluations) setEssayEvaluations(evaluations);
 
     if (quizData?.isStoryMode && typeof finalScore === 'number') {
         // Calculate max score based on question types
@@ -166,6 +168,7 @@ const App: React.FC = () => {
             onRetry={handleRetry} 
             onHome={handleHome} 
             score={score}
+            essayEvaluations={essayEvaluations}
           />
         )}
 

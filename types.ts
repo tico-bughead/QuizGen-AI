@@ -6,9 +6,9 @@ export enum Difficulty {
 
 export type QuizTheme = 'light' | 'dark' | 'vibrant' | 'retro' | 'neon' | 'summer' | 'autumn' | 'winter' | 'spring';
 
-export type QuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'FILL_IN_THE_BLANK';
+export type QuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MATCHING' | 'FILL_IN_THE_BLANK' | 'ESSAY';
 
-export type GameMode = 'classic' | 'arcade' | 'tv_show' | 'speed_run';
+export type GameMode = 'classic' | 'arcade' | 'tv_show' | 'speed_run' | 'essay_challenge';
 
 export type ArcadeMap = 'overworld' | 'underground' | 'athletic' | 'boss';
 
@@ -21,6 +21,15 @@ export interface MatchingPair {
   right: string;
 }
 
+export interface EssayEvaluation {
+  score: number; // 0-100
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+  styleFeedback?: string;
+  structureFeedback?: string;
+}
+
 export interface Question {
   id: number;
   type: QuestionType;
@@ -29,6 +38,7 @@ export interface Question {
   correctAnswerIndex?: number; // For MC and TF
   pairs?: MatchingPair[]; // For Matching
   explanation: string;
+  essayRubric?: string; // Optional rubric for essay evaluation
 }
 
 export interface QuizData {
@@ -64,4 +74,5 @@ export interface QuizConfig {
   playerNames?: string[];
   arcadeMap?: ArcadeMap;
   teachingStyle?: TeachingStyle;
+  questionTypes?: QuestionType[];
 }

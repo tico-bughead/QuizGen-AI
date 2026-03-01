@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { QuizData, UserAnswers, Difficulty, QuizTheme, Question, MatchingPair } from '../types';
+import { QuizData, UserAnswers, Difficulty, QuizTheme, Question, MatchingPair, EssayEvaluation } from '../types';
 import { Button } from './Button';
-import { ChevronRight, CheckCircle2, Timer, AlertCircle, XCircle, Volume2, VolumeX, SkipForward, Heart, Zap, Shield, Hourglass, Trophy } from 'lucide-react';
+import { ChevronRight, CheckCircle2, Timer, AlertCircle, XCircle, Volume2, VolumeX, SkipForward, Heart, Zap, Shield, Hourglass, Trophy, PenTool, Loader2 } from 'lucide-react';
 
 interface QuizGameProps {
   quiz: QuizData;
-  onComplete: (answers: UserAnswers, score?: number | number[]) => void;
+  onComplete: (answers: UserAnswers, score?: number | number[], essayEvaluations?: Record<number, EssayEvaluation>) => void;
 }
 
 const TIME_LIMITS: Record<Difficulty, number> = {
@@ -37,7 +37,7 @@ const THEME_MUSIC: Record<QuizTheme, string> = {
   spring: "https://actions.google.com/sounds/v1/ambiences/morning_farm_ambience.ogg",
 };
 
-import { generateSpeech } from '../services/geminiService';
+import { generateSpeech, evaluateEssay } from '../services/geminiService';
 
 export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -73,7 +73,16 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   // Se for TV, começa fechada (false) para abrir. Se não for TV, começa aberta (true).
   const [areCurtainsOpen, setAreCurtainsOpen] = useState(!quiz.isTvMode);
   
-  const timeLimit = quiz.gameMode === 'speed_run' ? 60 : TIME_LIMITS[quiz.difficulty];
+  const question = quiz.questions[currentQuestionIndex];
+  const totalQuestions = quiz.questions.length;
+
+  const getQuestionTimeLimit = () => {
+      if (quiz.gameMode === 'speed_run') return 60;
+      if (question.type === 'ESSAY') return 300; // 5 minutes for essay
+      return TIME_LIMITS[quiz.difficulty];
+  };
+
+  const timeLimit = getQuestionTimeLimit();
   const [timeLeft, setTimeLeft] = useState(timeLimit);
   const [isTimeUp, setIsTimeUp] = useState(false);
 
@@ -81,9 +90,6 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
-
-  const question = quiz.questions[currentQuestionIndex];
-  const totalQuestions = quiz.questions.length;
 
   // Determine effective theme based on Arcade Map if applicable
   const getEffectiveTheme = (): QuizTheme => {
@@ -201,6 +207,12 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   }, [quiz.isTvMode]);
 
   const [fillInBlankAnswer, setFillInBlankAnswer] = useState('');
+  
+  // Essay State
+  const [essayAnswer, setEssayAnswer] = useState('');
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [essayEvaluation, setEssayEvaluation] = useState<EssayEvaluation | null>(null);
+  const [allEssayEvaluations, setAllEssayEvaluations] = useState<Record<number, EssayEvaluation>>({});
 
   // Reset State on Question Change
   useEffect(() => {
@@ -212,6 +224,9 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
     setIsAnswerChecked(false);
     setIsFrozen(false);
     setFillInBlankAnswer('');
+    setEssayAnswer('');
+    setIsEvaluating(false);
+    setEssayEvaluation(null);
   }, [currentQuestionIndex, timeLimit, quiz.gameMode]);
 
   // Countdown Logic
@@ -221,15 +236,23 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev <= 1) {
-          setIsTimeUp(true);
-          
-          if (quiz.gameMode === 'speed_run') {
-              playSound('gameover');
-              onComplete(answers, score);
-              return 0;
-          }
+        if (prev <= 0) return 0;
+        return prev - 1;
+      });
+    }, 1000);
 
+    return () => clearInterval(timer);
+  }, [isAnswerChecked, isTimeUp, quiz.isTvMode, soundEnabled, areCurtainsOpen, isFrozen, quiz.gameMode]);
+
+  // Handle Time Up
+  useEffect(() => {
+    if (timeLeft === 0 && !isTimeUp) {
+      setIsTimeUp(true);
+      
+      if (quiz.gameMode === 'speed_run') {
+          playSound('gameover');
+          onComplete(answers, score, allEssayEvaluations);
+      } else {
           setIsAnswerChecked(true);
           // Toca som de erro (tempo esgotado)
           playSound('wrong');
@@ -238,16 +261,9 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
           if (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') {
              setLives(l => Math.max(0, l - 1));
           }
-          // Multiplayer: No lives lost, just no points.
-          
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isAnswerChecked, isTimeUp, quiz.isTvMode, soundEnabled, areCurtainsOpen, isFrozen, quiz.gameMode, answers, score]);
+      }
+    }
+  }, [timeLeft, isTimeUp, quiz.gameMode, answers, score, onComplete, allEssayEvaluations]);
 
   const handleOptionSelect = (index: number) => {
     if (!isTimeUp && !isAnswerChecked && !isTransitioning && !eliminatedOptions.includes(index)) {
@@ -347,32 +363,62 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
       }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!isAnswerChecked) {
       // Step 1: Confirm Answer
+      
+      // Handle ESSAY
+      if (question.type === 'ESSAY') {
+          if (!essayAnswer.trim()) return;
+          setIsEvaluating(true);
+          try {
+              const evaluation = await evaluateEssay(question.text, essayAnswer, question.essayRubric);
+              setEssayEvaluation(evaluation);
+              setAllEssayEvaluations(prev => ({ ...prev, [question.id]: evaluation }));
+              setIsAnswerChecked(true);
+              
+              // Score logic for Essay
+              const points = evaluation.score;
+              
+              if (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') {
+                  setScore(s => s + points * 5); // Max 500
+              } else if (quiz.isMultiplayer) {
+                  setPlayerScores(prev => {
+                      const newScores = [...prev];
+                      newScores[currentPlayerIndex] += points;
+                      return newScores;
+                  });
+              } else {
+                  setScore(s => s + points);
+              }
+              
+              setAnswers(prev => ({ ...prev, [question.id]: essayAnswer }));
+              
+              if (points >= 60) {
+                  playSound('correct');
+              } else {
+                  playSound('wrong');
+                  if (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') {
+                      setLives(l => Math.max(0, l - 1));
+                  }
+              }
+              
+          } catch (error) {
+              console.error("Error evaluating essay:", error);
+          } finally {
+              setIsEvaluating(false);
+          }
+          return;
+      }
+
       setIsAnswerChecked(true);
       let isCorrect = false;
       let finalAnswer: any = -1;
 
       if (question.type === 'MATCHING') {
-          // Logic handled in handleMatchingSelect, this block might be redundant for MATCHING if we auto-check
-          // But if we want manual confirm for matching, we'd check here.
-          // Current implementation auto-checks matching.
+          // Logic handled in handleMatchingSelect
       } else if (question.type === 'FILL_IN_THE_BLANK') {
           const normalizedUserAnswer = fillInBlankAnswer.trim().toLowerCase();
-          // We need to extract the correct answer from the explanation or have it in a separate field.
-          // Since the current schema puts the answer in explanation for FILL_IN_THE_BLANK, we might need to parse it or rely on the user to check against explanation.
-          // Ideally, the API should return the correct answer in a specific field.
-          // For now, let's assume the correct answer is the FIRST option if options are provided (as a hack) or we check if the explanation contains the user answer.
-          // BETTER: Let's assume the correct answer is in `correctAnswerIndex` (which is number) or we need to update the type.
-          // Actually, for FILL_IN_THE_BLANK, we usually need a string answer.
-          // Let's update the prompt to put the correct answer in `options[0]` for FILL_IN_THE_BLANK or similar.
-          // Let's try to match loosely against the explanation for now, or assume the AI puts the word in quotes in the explanation.
-          
-          // REVISION: Let's assume the correct answer is the string in `options[0]` if available, or we check if explanation contains it.
-          // Let's use a simple heuristic: if the explanation contains the user answer (case insensitive), it's correct.
-          // Or better, let's update the prompt in geminiService to put the correct answer in `options` array as the first element.
-          
           const correct = question.options?.[0]?.toLowerCase() || "";
           isCorrect = normalizedUserAnswer === correct || (correct === "" && question.explanation.toLowerCase().includes(normalizedUserAnswer));
           finalAnswer = fillInBlankAnswer;
@@ -381,7 +427,9 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
           isCorrect = finalAnswer === question.correctAnswerIndex;
       }
       
-      setAnswers(prev => ({ ...prev, [question.id]: finalAnswer }));
+      if (question.type !== 'MATCHING') {
+          setAnswers(prev => ({ ...prev, [question.id]: finalAnswer }));
+      }
 
       // Play Sound Effects
       if (isCorrect) {
@@ -429,7 +477,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
 
       // Check Game Over (Lives) - Arcade/TV Show Only
       if ((quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') && lives === 0) {
-          onComplete(answers, score);
+          onComplete(answers, score, allEssayEvaluations);
           return;
       }
 
@@ -455,10 +503,10 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
             setAreCurtainsOpen(false);
             // Aguarda a animação da cortina (1.5s) antes de navegar
             setTimeout(() => {
-                onComplete(answers, quiz.isMultiplayer ? playerScores : score);
+                onComplete(answers, quiz.isMultiplayer ? playerScores : score, allEssayEvaluations);
             }, 1500);
         } else {
-            onComplete(answers, quiz.isMultiplayer ? playerScores : score);
+            onComplete(answers, quiz.isMultiplayer ? playerScores : score, allEssayEvaluations);
         }
       }
   };
@@ -1060,6 +1108,28 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                         </p>
                     )}
                 </div>
+            ) : question.type === 'ESSAY' ? (
+                <div className="w-full space-y-4">
+                    <textarea
+                        value={essayAnswer}
+                        onChange={(e) => setEssayAnswer(e.target.value)}
+                        disabled={isAnswerChecked || isTimeUp || isEvaluating}
+                        placeholder="Digite sua resposta dissertativa aqui..."
+                        className={`w-full p-4 rounded-3xl border-2 text-lg outline-none transition-all min-h-[150px] resize-y ${
+                            isAnswerChecked
+                                ? (essayEvaluation?.score || 0) >= 60
+                                    ? 'border-green-500 bg-green-50 text-green-900'
+                                    : 'border-red-500 bg-red-50 text-red-900'
+                                : 'border-slate-300 focus:border-indigo-500'
+                        }`}
+                    />
+                    {isEvaluating && (
+                        <div className="flex items-center justify-center gap-2 text-indigo-600 animate-pulse">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span>A IA está analisando sua resposta...</span>
+                        </div>
+                    )}
+                </div>
             ) : (
                 <div className={`grid ${quiz.isTvMode ? 'grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6' : 'grid-cols-1 gap-3'}`}>
                     {question.options?.map((option, index) => {
@@ -1117,6 +1187,47 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
 
             {(isAnswerChecked || isTimeUp) && (
                 <div className={`mt-6 sm:mt-8 p-4 sm:p-6 rounded-[2rem] border animate-feedback ${styles.explanationBox}`}>
+                
+                {question.type === 'ESSAY' && essayEvaluation ? (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h4 className="font-bold text-lg">Avaliação da IA</h4>
+                            <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                essayEvaluation.score >= 60 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                                Nota: {essayEvaluation.score}/100
+                            </span>
+                        </div>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{essayEvaluation.feedback}</p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div className="bg-green-50/50 p-3 rounded-xl border border-green-100">
+                                <strong className="text-green-700 block mb-1">Pontos Fortes:</strong>
+                                <ul className="list-disc list-inside text-green-800/80">
+                                    {essayEvaluation.strengths.map((s, i) => <li key={i}>{s}</li>)}
+                                </ul>
+                            </div>
+                            <div className="bg-red-50/50 p-3 rounded-xl border border-red-100">
+                                <strong className="text-red-700 block mb-1">Pontos de Melhoria:</strong>
+                                <ul className="list-disc list-inside text-red-800/80">
+                                    {essayEvaluation.improvements.map((s, i) => <li key={i}>{s}</li>)}
+                                </ul>
+                            </div>
+                            {essayEvaluation.styleFeedback && (
+                                <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                                    <strong className="text-blue-700 block mb-1">Estilo e Tom:</strong>
+                                    <p className="text-blue-800/80">{essayEvaluation.styleFeedback}</p>
+                                </div>
+                            )}
+                            {essayEvaluation.structureFeedback && (
+                                <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100">
+                                    <strong className="text-purple-700 block mb-1">Estrutura e Organização:</strong>
+                                    <p className="text-purple-800/80">{essayEvaluation.structureFeedback}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : (
                 <div className="flex items-start gap-3">
                     <div className={`mt-1 p-2 rounded-full flex-shrink-0 ${
                         isSkipped 
@@ -1147,6 +1258,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                         </p>
                     </div>
                 </div>
+                )}
                 </div>
             )}
 
@@ -1167,8 +1279,8 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                 {question.type !== 'MATCHING' && (
                     <Button
                     onClick={handleConfirm}
-                    disabled={(!isAnswerChecked && (question.type === 'FILL_IN_THE_BLANK' ? fillInBlankAnswer.trim() === '' : selectedOption === null)) || isTransitioning}
-                    icon={isAnswerChecked && isLastQuestion ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6"/> : undefined}
+                    disabled={(!isAnswerChecked && (question.type === 'FILL_IN_THE_BLANK' ? fillInBlankAnswer.trim() === '' : question.type === 'ESSAY' ? essayAnswer.trim() === '' : selectedOption === null)) || isTransitioning || isEvaluating}
+                    icon={isAnswerChecked && isLastQuestion ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6"/> : isEvaluating ? <Loader2 className="w-5 h-5 animate-spin" /> : undefined}
                     variant={quiz.isTvMode || quiz.theme === 'vibrant' ? 'outline' : "primary"}
                     className={quiz.isTvMode ? 'text-lg sm:text-xl py-3 sm:py-4 px-6 sm:px-8 font-bold border-2 w-full sm:w-auto' : 'w-full sm:w-auto'}
                     style={quiz.isTvMode ? { 
@@ -1180,7 +1292,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                     >
                     {!isAnswerChecked ? (
                         <span className="flex items-center justify-center">
-                        Confirmar
+                        {isEvaluating ? 'Avaliando...' : 'Confirmar'}
                         </span>
                     ) : (
                         <span className="flex items-center justify-center">

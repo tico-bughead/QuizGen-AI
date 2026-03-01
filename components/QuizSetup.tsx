@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Difficulty, QuizConfig, QuizTheme, GameMode, ArcadeMap, TeachingStyle } from '../types';
+import { Difficulty, QuizConfig, QuizTheme, GameMode, ArcadeMap, TeachingStyle, QuestionType } from '../types';
 import { Button } from './Button';
-import { BrainCircuit, Sparkles, BookOpen, Layers, Tv, Palette, Sun, Moon, Zap, Gamepad2, Trophy, Leaf, Snowflake, Flower2, Map, Mountain, Skull, Trees, Info, GraduationCap } from 'lucide-react';
+import { BrainCircuit, Sparkles, BookOpen, Layers, Tv, Palette, Sun, Moon, Zap, Gamepad2, Trophy, Leaf, Snowflake, Flower2, Map, Mountain, Skull, Trees, Info, GraduationCap, PenTool, CheckSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface QuizSetupProps {
@@ -16,6 +16,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
   const [questionCount, setQuestionCount] = useState<number>(5);
   const [theme, setTheme] = useState<QuizTheme>('light');
   const [teachingStyle, setTeachingStyle] = useState<TeachingStyle>('standard');
+  const [selectedQuestionTypes, setSelectedQuestionTypes] = useState<QuestionType[]>(['MULTIPLE_CHOICE', 'TRUE_FALSE', 'MATCHING', 'FILL_IN_THE_BLANK']);
   // Removed isTvMode state as it is now derived from gameMode,  
   // BUT we need to pass it to onStart. We'll derive it there.
   const [gameMode, setGameMode] = useState<GameMode>('classic');
@@ -81,6 +82,18 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
     </div>
   );
 
+  const handleQuestionTypeToggle = (type: QuestionType) => {
+      setSelectedQuestionTypes(prev => {
+          if (prev.includes(type)) {
+              // Prevent deselecting all
+              if (prev.length === 1) return prev;
+              return prev.filter(t => t !== type);
+          } else {
+              return [...prev, type];
+          }
+      });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (topic.trim()) {
@@ -92,6 +105,13 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
       // Derive isTvMode from gameMode selection
       const isTvMode = gameMode === 'tv_show';
       
+      // Determine final question types based on game mode
+      let finalQuestionTypes: QuestionType[] = selectedQuestionTypes;
+      if (gameMode === 'essay_challenge') {
+          finalQuestionTypes = ['ESSAY'];
+      }
+      // For other modes, we use selectedQuestionTypes directly, which can now include ESSAY if selected.
+
       onStart({ 
           topic, 
           difficulty, 
@@ -103,7 +123,8 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
           isStoryMode: gameMode === 'arcade' ? isStoryMode : false,
           playerNames,
           arcadeMap: gameMode === 'arcade' ? (isStoryMode ? 'overworld' : arcadeMap) : undefined,
-          teachingStyle
+          teachingStyle,
+          questionTypes: finalQuestionTypes
       });
     }
   };
@@ -127,6 +148,33 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
         {/* Right Panel - Form */}
         <div className="p-6 md:p-10 bg-white">
           <form onSubmit={handleSubmit} className="space-y-8">
+            
+            {/* Quick Action Banner for Essay */}
+            <div 
+                onClick={() => {
+                    setGameMode('essay_challenge');
+                    document.getElementById('topic')?.focus();
+                }}
+                className="p-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[2rem] text-white flex items-center justify-between relative overflow-hidden group cursor-pointer shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
+            >
+                <div className="relative z-10">
+                    <h3 className="text-xl sm:text-2xl font-bold mb-1 flex items-center gap-2">
+                        <PenTool className="w-6 h-6" />
+                        Treino de Redação
+                    </h3>
+                    <p className="text-indigo-100 text-xs sm:text-sm font-medium max-w-[80%]">
+                        Pratique sua escrita e receba feedback detalhado da IA sobre estrutura e estilo.
+                    </p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm relative z-10 transition-transform group-hover:scale-110 group-hover:rotate-3">
+                    <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                
+                {/* Decorative elements */}
+                <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+                <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-purple-900/20 rounded-full blur-3xl" />
+            </div>
+
             {/* Topic Input */}
             <div className="space-y-3">
               <label htmlFor="topic" className="block text-sm font-medium text-slate-700 flex items-center gap-2">
@@ -162,9 +210,9 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                     <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
                         <Gamepad2 className="w-4 h-4 text-indigo-500" />
                         Modo de Jogo
-                        <Tooltip id="gameMode" text="Escolha como quer jogar: Clássico, Arcade (com mapas), TV Show ou Desafio Rápido." />
+                        <Tooltip id="gameMode" text="Escolha como quer jogar: Clássico, Arcade (com mapas), TV Show, Desafio Rápido ou Redação." />
                     </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                         <button
                             type="button"
                             onClick={() => setGameMode('classic')}
@@ -205,7 +253,18 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                         >
                             <div className="flex flex-col items-center gap-2 text-center">
                                 <Zap className={`w-8 h-8 ${gameMode === 'speed_run' ? 'text-indigo-600' : 'text-slate-500'}`} />
-                                <span className={`font-bold text-xs ${gameMode === 'speed_run' ? 'text-indigo-900' : 'text-slate-700'}`}>Desafio Rápido</span>
+                                <span className={`font-bold text-xs ${gameMode === 'speed_run' ? 'text-indigo-900' : 'text-slate-700'}`}>Rápido</span>
+                            </div>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setGameMode('essay_challenge')}
+                            className={`aspect-square flex flex-col items-center justify-center p-4 rounded-[2rem] border transition-all ${gameMode === 'essay_challenge' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-slate-200 hover:border-slate-300'}`}
+                        >
+                            <div className="flex flex-col items-center gap-2 text-center">
+                                <PenTool className={`w-8 h-8 ${gameMode === 'essay_challenge' ? 'text-indigo-600' : 'text-slate-500'}`} />
+                                <span className={`font-bold text-xs ${gameMode === 'essay_challenge' ? 'text-indigo-900' : 'text-slate-700'}`}>Redação</span>
                             </div>
                         </button>
                     </div>
@@ -289,6 +348,40 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                                     </button>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Question Types (Only for non-Essay modes) */}
+                {gameMode !== 'essay_challenge' && (
+                    <div className="space-y-3 md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
+                            <CheckSquare className="w-4 h-4 text-indigo-500" />
+                            Tipos de Questões
+                            <Tooltip id="qTypes" text="Selecione quais tipos de perguntas você quer no quiz." />
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {[
+                                { type: 'MULTIPLE_CHOICE', label: 'Múltipla Escolha' },
+                                { type: 'TRUE_FALSE', label: 'V ou F' },
+                                { type: 'FILL_IN_THE_BLANK', label: 'Resposta Curta' },
+                                { type: 'MATCHING', label: 'Relacionar' },
+                                { type: 'ESSAY', label: 'Redação' }
+                            ].map((item) => (
+                                <button
+                                    key={item.type}
+                                    type="button"
+                                    onClick={() => handleQuestionTypeToggle(item.type as QuestionType)}
+                                    className={`px-3 py-2 text-xs sm:text-sm rounded-xl border transition-all flex items-center justify-center gap-2 ${
+                                        selectedQuestionTypes.includes(item.type as QuestionType)
+                                        ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-medium'
+                                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    {selectedQuestionTypes.includes(item.type as QuestionType) && <CheckSquare className="w-3 h-3" />}
+                                    {item.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 )}

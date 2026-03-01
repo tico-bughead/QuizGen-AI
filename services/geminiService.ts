@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { QuizData, Difficulty, QuizConfig } from "../types";
+import { QuizData, Difficulty, QuizConfig, EssayEvaluation } from "../types";
 
 export const generateSpeech = async (text: string): Promise<string | null> => {
   try {
@@ -22,6 +22,60 @@ export const generateSpeech = async (text: string): Promise<string | null> => {
   } catch (error) {
     console.error("Erro ao gerar áudio:", error);
     return null;
+  }
+};
+
+export const evaluateEssay = async (
+  questionText: string,
+  userAnswer: string,
+  rubric?: string
+): Promise<EssayEvaluation> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const model = "gemini-2.5-flash";
+
+  const prompt = `
+    Avalie a seguinte resposta dissertativa para a questão: "${questionText}".
+    Resposta do aluno: "${userAnswer}"
+    ${rubric ? `Rubrica de avaliação: ${rubric}` : ''}
+
+    Forneça uma avaliação construtiva e detalhada.
+    Retorne um JSON com:
+    - score: nota de 0 a 100.
+    - feedback: um parágrafo geral sobre a resposta.
+    - strengths: lista de pontos fortes.
+    - improvements: lista de pontos a melhorar.
+    - styleFeedback: sugestões específicas para melhorar o estilo de escrita (clareza, vocabulário, tom).
+    - structureFeedback: sugestões específicas para melhorar a estrutura (organização, parágrafos, fluxo).
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.INTEGER },
+            feedback: { type: Type.STRING },
+            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+            improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
+            styleFeedback: { type: Type.STRING },
+            structureFeedback: { type: Type.STRING },
+          },
+          required: ["score", "feedback", "strengths", "improvements"],
+        },
+      },
+    });
+
+    if (response.text) {
+      return JSON.parse(response.text) as EssayEvaluation;
+    }
+    throw new Error("Resposta vazia da IA na avaliação.");
+  } catch (error) {
+    console.error("Erro ao avaliar redação:", error);
+    throw error;
   }
 };
 
@@ -86,6 +140,39 @@ export const generateQuiz = async (
       `;
   }
 
+  const isEssayMode = config.gameMode === 'essay_challenge';
+  let questionTypeInstruction = "";
+
+  if (isEssayMode) {
+      questionTypeInstruction = `
+        IMPORTANTE: Gere APENAS perguntas dissertativas (ESSAY).
+        As perguntas devem exigir reflexão, argumentação e análise profunda do tema.
+        Inclua um campo "essayRubric" com critérios de avaliação para a resposta.
+      `;
+  } else if (config.questionTypes && config.questionTypes.length > 0) {
+      const types = config.questionTypes.join(', ');
+      questionTypeInstruction = `
+        IMPORTANTE: Gere APENAS perguntas dos seguintes tipos: ${types}.
+        Distribua as perguntas entre esses tipos de forma equilibrada.
+        
+        Detalhes por tipo:
+        - MULTIPLE_CHOICE: Pergunta com 4 opções e 1 correta.
+        - TRUE_FALSE: Pergunta com opções "Verdadeiro" e "Falso".
+        - MATCHING: 3 a 4 pares de conceitos para relacionar.
+        - FILL_IN_THE_BLANK: Uma frase com uma lacuna (___) e a resposta correta (única palavra ou termo curto).
+        - ESSAY: Pergunta dissertativa que exige argumentação. Inclua 'essayRubric'.
+      `;
+  } else {
+      questionTypeInstruction = `
+        IMPORTANTE: Varie os tipos de perguntas.
+        - A maioria deve ser de Múltipla Escolha (MULTIPLE_CHOICE).
+        - Inclua algumas de Verdadeiro ou Falso (TRUE_FALSE).
+        - Inclua pelo menos uma de Relacionar Colunas (MATCHING) se o conteúdo permitir.
+        - Inclua pelo menos uma de Preencher a Lacuna (FILL_IN_THE_BLANK) se o conteúdo permitir.
+        - Você PODE incluir uma pergunta dissertativa (ESSAY) se for muito relevante para o tema, mas priorize as outras.
+      `;
+  }
+
   const prompt = `
     Gere um quiz educacional e desafiador sobre o(s) tópico(s): "${config.topic}".
     Se houver múltiplos tópicos separados por vírgula, misture perguntas sobre todos eles de forma equilibrada.
@@ -97,11 +184,7 @@ export const generateQuiz = async (
     Estilo de Ensino: ${teachingStyleInstruction}
     ${storyInstruction}
     
-    IMPORTANTE: Varie os tipos de perguntas.
-    - A maioria deve ser de Múltipla Escolha (MULTIPLE_CHOICE).
-    - Inclua algumas de Verdadeiro ou Falso (TRUE_FALSE).
-    - Inclua pelo menos uma de Relacionar Colunas (MATCHING) se o conteúdo permitir.
-    - Inclua pelo menos uma de Preencher a Lacuna (FILL_IN_THE_BLANK) se o conteúdo permitir.
+    ${questionTypeInstruction}
     
     Diretrizes Gerais:
     - Certifique-se de que as perguntas sejam claras, as opções sejam plausíveis e a explicação seja útil.
@@ -128,18 +211,18 @@ export const generateQuiz = async (
                   id: { type: Type.INTEGER },
                   type: { 
                     type: Type.STRING, 
-                    enum: ["MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING", "FILL_IN_THE_BLANK"],
+                    enum: ["MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING", "FILL_IN_THE_BLANK", "ESSAY"],
                     description: "O tipo da pergunta"
                   },
                   text: { type: Type.STRING, description: "O enunciado da pergunta. Para FILL_IN_THE_BLANK, use '___' para indicar a lacuna." },
                   options: {
                     type: Type.ARRAY,
                     items: { type: Type.STRING },
-                    description: "Lista de opções (para MC e TF). Para TF, use ['Verdadeiro', 'Falso']. Para FILL_IN_THE_BLANK, inclua APENAS a resposta correta como único item. Deixe vazio para MATCHING.",
+                    description: "Lista de opções (para MC e TF). Para TF, use ['Verdadeiro', 'Falso']. Para FILL_IN_THE_BLANK, inclua APENAS a resposta correta como único item. Deixe vazio para MATCHING e ESSAY.",
                   },
                   correctAnswerIndex: {
                     type: Type.INTEGER,
-                    description: "Índice da resposta correta (para MC e TF). Deixe null/0 para MATCHING e FILL_IN_THE_BLANK.",
+                    description: "Índice da resposta correta (para MC e TF). Deixe null/0 para MATCHING, FILL_IN_THE_BLANK e ESSAY.",
                   },
                   pairs: {
                     type: Type.ARRAY,
@@ -155,8 +238,12 @@ export const generateQuiz = async (
                   },
                   explanation: {
                     type: Type.STRING,
-                    description: "Uma breve explicação de por que a resposta está correta. Para FILL_IN_THE_BLANK, a resposta correta deve estar claramente indicada aqui.",
+                    description: "Uma breve explicação de por que a resposta está correta. Para FILL_IN_THE_BLANK, a resposta correta deve estar claramente indicada aqui. Para ESSAY, forneça pontos-chave que deveriam ser abordados.",
                   },
+                  essayRubric: {
+                      type: Type.STRING,
+                      description: "Critérios de avaliação para a resposta dissertativa (apenas para ESSAY)."
+                  }
                 },
                 required: ["id", "type", "text", "explanation"],
               },
