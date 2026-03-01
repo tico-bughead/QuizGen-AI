@@ -45,7 +45,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate, onEssayGe
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.4 }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12"
       >
         <div className="bg-white p-6 rounded-3xl shadow-xl border border-slate-100 hover:shadow-2xl transition-shadow">
           <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center mb-4 text-indigo-600">
@@ -69,6 +69,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate, onEssayGe
           </div>
           <h3 className="text-lg font-bold text-slate-800 mb-2">Multiplayer</h3>
           <p className="text-slate-500">Desafie seus amigos localmente e veja quem sabe mais.</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl shadow-xl border border-slate-100 hover:shadow-2xl transition-shadow">
+          <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mb-4 text-emerald-600">
+            <PenTool className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800 mb-2">Redação</h3>
+          <p className="text-slate-500">Pratique com temas estilo ENEM, modelos nota 1000 e receba correção detalhada.</p>
         </div>
       </motion.div>
 

@@ -62,7 +62,8 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
         y += 8;
     }
     
-    doc.save("folha_redacao.pdf");
+    const fileName = window.prompt("Digite o nome do arquivo:", "folha_redacao") || "folha_redacao";
+    doc.save(`${fileName}.pdf`);
   };
 
   const handleDownloadDraft = () => {
@@ -146,7 +147,8 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
         y += 10;
     });
 
-    doc.save("rascunhao_redacao.pdf");
+    const fileName = window.prompt("Digite o nome do arquivo:", "rascunhao_redacao") || "rascunhao_redacao";
+    doc.save(`${fileName}.pdf`);
   };
 
   const handleDownloadModel = () => {
@@ -167,7 +169,8 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
     const splitText = doc.splitTextToSize(generatedModel, pageWidth - 40);
     doc.text(splitText, 20, 50);
     
-    doc.save("redacao_modelo.pdf");
+    const fileName = window.prompt("Digite o nome do arquivo:", "redacao_modelo") || "redacao_modelo";
+    doc.save(`${fileName}.pdf`);
   };
 
   return (
