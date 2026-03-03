@@ -1099,9 +1099,13 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
         <div className={`${styles.card} ${isTimeout ? styles.cardTimeUp : ''} rounded-[2.5rem] p-4 sm:p-6 md:p-10 relative overflow-hidden transition-all duration-300 flex flex-col`}>
           
           <div className={`transition-all duration-300 ease-in-out transform w-full flex flex-col ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-            <h2 className={`${styles.title} font-bold ${styles.textMain} mb-2 leading-relaxed flex items-center justify-center gap-2`}>
-                {question.text}
-                {question.type !== 'MATCHING' && (
+            <h2 className={`${styles.title} font-bold ${styles.textMain} mb-2 leading-relaxed flex flex-col items-center justify-center gap-4`}>
+                {question.image && (
+                    <img src={question.image} alt="Question" className="w-full max-w-md h-48 sm:h-64 object-cover rounded-2xl shadow-lg border-4 border-white/20" />
+                )}
+                <div className="flex items-center gap-2">
+                    {question.text}
+                    {question.type !== 'MATCHING' && (
                     <button 
                         onClick={() => {
                             if (isPlayingAudio && currentAudioRef.current) {
@@ -1124,6 +1128,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                         {isPlayingAudio ? <Volume2 className="w-5 h-5 animate-pulse" /> : <Volume2 className="w-5 h-5" />}
                     </button>
                 )}
+                </div>
             </h2>
             {question.type === 'MATCHING' && !isAnswerChecked && (
                 <p className={`${styles.textSec} text-sm mb-6 italic`}>
@@ -1433,9 +1438,14 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                         }`}>
                             {icon ? icon : (isSelected && <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-current`} />)}
                         </div>
-                        <span className={`${styles.optionText} font-medium`}>
-                            {option}
-                        </span>
+                        <div className="flex flex-col items-start w-full min-w-0">
+                            {question.optionImages?.[index] && (
+                                <img src={question.optionImages[index]} alt="Option" className="w-full h-32 object-cover rounded-xl mb-3 border border-black/10" />
+                            )}
+                            <span className={`${styles.optionText} font-medium break-words w-full`}>
+                                {option}
+                            </span>
+                        </div>
                         </button>
                     );
                     })}

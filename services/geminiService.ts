@@ -5,14 +5,14 @@ export const generateImage = async (prompt: string, size: "512px" | "1K" | "2K" 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-image-preview",
+      model: "gemini-2.5-flash-image",
       contents: {
         parts: [{ text: prompt }],
       },
       config: {
         imageConfig: {
             aspectRatio: "1:1",
-            imageSize: size
+            // imageSize is not supported in gemini-2.5-flash-image
         }
       },
     });
@@ -285,6 +285,8 @@ export const generateQuiz = async (
         
         Detalhes por tipo:
         - MULTIPLE_CHOICE: Pergunta com 4 opções e 1 correta.
+          - Você pode definir 'optionImages: [true, true, true, true]' para gerar imagens para todas as opções.
+          - Exemplo: Qual destes animais é um mamífero? (Opções com imagens de animais).
         - TRUE_FALSE: Pergunta com opções "Verdadeiro" e "Falso".
         - MATCHING: 3 a 4 pares de conceitos para relacionar.
           IMPORTANTE: Utilize imagens para tornar o quiz mais visual.
@@ -324,6 +326,7 @@ export const generateQuiz = async (
     Diretrizes Gerais:
     - Certifique-se de que as perguntas sejam claras, as opções sejam plausíveis e a explicação seja útil.
     - O título do quiz deve ser criativo e relacionado ao tópico.
+    - Utilize 'questionImage: true' para gerar imagens ilustrativas para o enunciado das perguntas sempre que possível, especialmente para perguntas que descrevem cenários, objetos ou animais.
   `;
 
   try {
@@ -350,10 +353,16 @@ export const generateQuiz = async (
                     description: "O tipo da pergunta"
                   },
                   text: { type: Type.STRING, description: "O enunciado da pergunta. Para FILL_IN_THE_BLANK, use '___' para indicar a lacuna." },
+                  questionImage: { type: Type.BOOLEAN, description: "Defina como true se a pergunta deve ter uma imagem gerada a partir do enunciado." },
                   options: {
                     type: Type.ARRAY,
                     items: { type: Type.STRING },
                     description: "Lista de opções (para MC e TF). Para TF, use ['Verdadeiro', 'Falso']. Para FILL_IN_THE_BLANK, inclua APENAS a resposta correta como único item. Deixe vazio para MATCHING e ESSAY.",
+                  },
+                  optionImages: {
+                      type: Type.ARRAY,
+                      items: { type: Type.BOOLEAN },
+                      description: "Array de 4 booleanos. Defina como true se a opção correspondente deve ser uma imagem gerada a partir do texto da opção (apenas para MULTIPLE_CHOICE)."
                   },
                   correctAnswerIndex: {
                     type: Type.INTEGER,
@@ -398,8 +407,17 @@ export const generateQuiz = async (
     if (response.text) {
       const data = JSON.parse(response.text);
       
-      // Post-process to generate images for MATCHING questions
+      // Post-process to generate images for questions
       await Promise.all(data.questions.map(async (q: any) => {
+          // Question Image
+          if (q.questionImage) {
+              try {
+                  q.image = await generateImage(q.text, "512px");
+              } catch (e) {
+                  console.error("Failed to generate question image", e);
+              }
+          }
+
           if (q.type === 'MATCHING' && q.pairs) {
               await Promise.all(q.pairs.map(async (pair: any) => {
                   if (pair.leftIsImage) {
@@ -416,6 +434,18 @@ export const generateQuiz = async (
                           console.error("Failed to generate right image", e);
                       }
                   }
+              }));
+          } else if (q.type === 'MULTIPLE_CHOICE' && q.optionImages) {
+              q.optionImages = await Promise.all(q.optionImages.map(async (shouldGen: boolean, idx: number) => {
+                  if (shouldGen && q.options[idx]) {
+                      try {
+                          return await generateImage(q.options[idx], "512px");
+                      } catch (e) {
+                          console.error("Failed to generate option image", e);
+                          return null;
+                      }
+                  }
+                  return null;
               }));
           }
       }));

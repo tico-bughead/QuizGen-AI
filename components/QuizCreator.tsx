@@ -14,18 +14,65 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
   const [title, setTitle] = useState('');
   const [topic, setTopic] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.Medium);
+  const [theme, setTheme] = useState<QuizTheme>('light');
   const [questions, setQuestions] = useState<Question[]>([
     {
       id: 1,
       type: 'MULTIPLE_CHOICE',
       text: '',
       options: ['', '', '', ''],
+      optionImages: ['', '', '', ''],
       correctAnswerIndex: 0,
       explanation: ''
     }
   ]);
 
   const [generatingImages, setGeneratingImages] = useState<Record<string, boolean>>({});
+
+  const handleImageUpload = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleUploadForPair = async (qIndex: number, pIndex: number, side: 'left' | 'right', file: File) => {
+      try {
+          const imageUrl = await handleImageUpload(file);
+          const field = side === 'left' ? 'leftImage' : 'rightImage';
+          const newQuestions = [...questions];
+          const newPairs = [...(newQuestions[qIndex].pairs || [])];
+          newPairs[pIndex] = { ...newPairs[pIndex], [field]: imageUrl };
+          newQuestions[qIndex].pairs = newPairs;
+          setQuestions(newQuestions);
+      } catch (e) {
+          console.error("Upload failed", e);
+      }
+  };
+
+  const handleUploadForOption = async (qIndex: number, oIndex: number, file: File) => {
+      try {
+          const imageUrl = await handleImageUpload(file);
+          const newQuestions = [...questions];
+          const newOptionImages = [...(newQuestions[qIndex].optionImages || ['', '', '', ''])];
+          newOptionImages[oIndex] = imageUrl;
+          newQuestions[qIndex].optionImages = newOptionImages;
+          setQuestions(newQuestions);
+      } catch (e) {
+          console.error("Upload failed", e);
+      }
+  };
+
+  const handleRemoveOptionImage = (qIndex: number, oIndex: number) => {
+      const newQuestions = [...questions];
+      const newOptionImages = [...(newQuestions[qIndex].optionImages || ['', '', '', ''])];
+      newOptionImages[oIndex] = '';
+      newQuestions[qIndex].optionImages = newOptionImages;
+      setQuestions(newQuestions);
+  };
+
 
   const handleGenerateImageForPair = async (qIndex: number, pIndex: number, side: 'left' | 'right') => {
     const question = questions[qIndex];
@@ -208,7 +255,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
       topic,
       difficulty,
       questions,
-      theme: 'light', // Default theme
+      theme, // Selected theme
       isTvMode: false,
       gameMode: 'classic',
       isMultiplayer: false
@@ -261,6 +308,24 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
               placeholder="Ex: Matemática"
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
             />
+          </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-700">Tema Visual</label>
+            <select
+                value={theme}
+                onChange={(e) => setTheme(e.target.value as QuizTheme)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+            >
+                <option value="light">Claro (Padrão)</option>
+                <option value="dark">Escuro</option>
+                <option value="vibrant">Vibrante</option>
+                <option value="retro">Retrô</option>
+                <option value="neon">Neon</option>
+                <option value="summer">Verão</option>
+                <option value="autumn">Outono</option>
+                <option value="winter">Inverno</option>
+                <option value="spring">Primavera</option>
+            </select>
           </div>
         </div>
 
@@ -325,33 +390,163 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                             </div>
                         )}
 
-                        <input
-                          type="text"
-                          value={q.text}
-                          onChange={(e) => handleQuestionChange(qIndex, 'text', e.target.value)}
-                          placeholder={q.type === 'ESSAY' ? "Digite o tema da redação ou enunciado..." : (q.type === 'FILL_IN_THE_BLANK' ? "Digite a frase com a lacuna (Ex: O céu é ___)" : "Digite a pergunta aqui...")}
-                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium"
-                        />
+                        <div className="flex gap-2 items-start">
+                            <div className="flex-grow space-y-2">
+                                <input
+                                  type="text"
+                                  value={q.text}
+                                  onChange={(e) => handleQuestionChange(qIndex, 'text', e.target.value)}
+                                  placeholder={q.type === 'ESSAY' ? "Digite o tema da redação ou enunciado..." : (q.type === 'FILL_IN_THE_BLANK' ? "Digite a frase com a lacuna (Ex: O céu é ___)" : "Digite a pergunta aqui...")}
+                                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium"
+                                />
+                                <div className="flex gap-2 items-center">
+                                    {q.image ? (
+                                        <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 group/img">
+                                            <img src={q.image} alt="Question" className="w-full h-full object-cover" />
+                                            <button 
+                                                onClick={() => handleQuestionChange(qIndex, 'image', undefined)}
+                                                className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity text-white"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    const text = q.text;
+                                                    if (!text.trim()) {
+                                                        alert("Digite um texto para gerar a imagem.");
+                                                        return;
+                                                    }
+                                                    const key = `${qIndex}-text`;
+                                                    setGeneratingImages(prev => ({ ...prev, [key]: true }));
+                                                    generateImage(text, "512px").then(url => {
+                                                        if (url) {
+                                                            handleQuestionChange(qIndex, 'image', url);
+                                                        }
+                                                    }).catch(e => {
+                                                        console.error(e);
+                                                        alert("Erro ao gerar imagem.");
+                                                    }).finally(() => {
+                                                        setGeneratingImages(prev => {
+                                                            const next = { ...prev };
+                                                            delete next[key];
+                                                            return next;
+                                                        });
+                                                    });
+                                                }}
+                                                disabled={generatingImages[`${qIndex}-text`]}
+                                                className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-3 py-2 rounded-lg hover:bg-indigo-100 transition-colors font-medium"
+                                            >
+                                                {generatingImages[`${qIndex}-text`] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                                Gerar Imagem do Enunciado
+                                            </button>
+                                            <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200 font-medium">
+                                                <ImageIcon className="w-4 h-4" />
+                                                Subir Imagem
+                                                <input 
+                                                    type="file" 
+                                                    className="hidden" 
+                                                    accept="image/*"
+                                                    onChange={(e) => {
+                                                        if (e.target.files?.[0]) {
+                                                            handleImageUpload(e.target.files[0]).then(url => {
+                                                                handleQuestionChange(qIndex, 'image', url);
+                                                            });
+                                                        }
+                                                    }}
+                                                />
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                         
                         {/* MULTIPLE CHOICE */}
                         {q.type === 'MULTIPLE_CHOICE' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {q.options?.map((opt, oIndex) => (
-                                <div key={oIndex} className="flex items-center gap-3">
-                                  <input
-                                    type="radio"
-                                    name={`correct-${qIndex}`}
-                                    checked={q.correctAnswerIndex === oIndex}
-                                    onChange={() => handleQuestionChange(qIndex, 'correctAnswerIndex', oIndex)}
-                                    className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={opt}
-                                    onChange={(e) => handleOptionChange(qIndex, oIndex, e.target.value)}
-                                    placeholder={`Opção ${oIndex + 1}`}
-                                    className={`w-full px-4 py-2 bg-white border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm ${q.correctAnswerIndex === oIndex ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-200'}`}
-                                  />
+                                <div key={oIndex} className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="radio"
+                                        name={`correct-${qIndex}`}
+                                        checked={q.correctAnswerIndex === oIndex}
+                                        onChange={() => handleQuestionChange(qIndex, 'correctAnswerIndex', oIndex)}
+                                        className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 flex-shrink-0"
+                                      />
+                                      <div className="flex-grow relative flex items-center gap-2">
+                                          <input
+                                            type="text"
+                                            value={opt}
+                                            onChange={(e) => handleOptionChange(qIndex, oIndex, e.target.value)}
+                                            placeholder={`Opção ${oIndex + 1}`}
+                                            className={`w-full px-4 py-2 bg-white border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm pr-20 ${q.correctAnswerIndex === oIndex ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-200'}`}
+                                          />
+                                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                              <button
+                                                  onClick={() => {
+                                                      const text = opt;
+                                                      if (!text.trim()) {
+                                                          alert("Digite um texto para gerar a imagem.");
+                                                          return;
+                                                      }
+                                                      const key = `${qIndex}-${oIndex}-opt`;
+                                                      setGeneratingImages(prev => ({ ...prev, [key]: true }));
+                                                      generateImage(text, "512px").then(url => {
+                                                          if (url) {
+                                                              const newQuestions = [...questions];
+                                                              const newOptionImages = [...(newQuestions[qIndex].optionImages || ['', '', '', ''])];
+                                                              newOptionImages[oIndex] = url;
+                                                              newQuestions[qIndex].optionImages = newOptionImages;
+                                                              setQuestions(newQuestions);
+                                                          }
+                                                      }).catch(e => {
+                                                          console.error(e);
+                                                          alert("Erro ao gerar imagem.");
+                                                      }).finally(() => {
+                                                          setGeneratingImages(prev => {
+                                                              const next = { ...prev };
+                                                              delete next[key];
+                                                              return next;
+                                                          });
+                                                      });
+                                                  }}
+                                                  disabled={generatingImages[`${qIndex}-${oIndex}-opt`]}
+                                                  className="p-1 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                                                  title="Gerar Imagem com IA"
+                                              >
+                                                  {generatingImages[`${qIndex}-${oIndex}-opt`] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                              </button>
+                                              <label className="cursor-pointer text-slate-400 hover:text-indigo-600 transition-colors p-1" title="Subir Imagem">
+                                                  <ImageIcon className="w-4 h-4" />
+                                                  <input 
+                                                      type="file" 
+                                                      className="hidden" 
+                                                      accept="image/*"
+                                                      onChange={(e) => {
+                                                          if (e.target.files?.[0]) {
+                                                              handleUploadForOption(qIndex, oIndex, e.target.files[0]);
+                                                          }
+                                                      }}
+                                                  />
+                                              </label>
+                                          </div>
+                                      </div>
+                                    </div>
+                                    {q.optionImages?.[oIndex] && (
+                                        <div className="ml-8 relative w-full h-32 rounded-lg overflow-hidden border border-slate-200 group/img">
+                                            <img src={q.optionImages[oIndex]} alt={`Option ${oIndex + 1}`} className="w-full h-full object-cover" />
+                                            <button 
+                                                onClick={() => handleRemoveOptionImage(qIndex, oIndex)}
+                                                className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity text-white"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                               ))}
                             </div>
@@ -424,14 +619,30 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <button
-                                                            onClick={() => handleGenerateImageForPair(qIndex, pIndex, 'left')}
-                                                            disabled={generatingImages[`${qIndex}-${pIndex}-left`]}
-                                                            className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
-                                                        >
-                                                            {generatingImages[`${qIndex}-${pIndex}-left`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                                            Gerar Imagem
-                                                        </button>
+                                                        <div className="flex gap-1">
+                                                            <button
+                                                                onClick={() => handleGenerateImageForPair(qIndex, pIndex, 'left')}
+                                                                disabled={generatingImages[`${qIndex}-${pIndex}-left`]}
+                                                                className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
+                                                            >
+                                                                {generatingImages[`${qIndex}-${pIndex}-left`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                                                Gerar
+                                                            </button>
+                                                            <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200">
+                                                                <ImageIcon className="w-3 h-3" />
+                                                                Subir
+                                                                <input 
+                                                                    type="file" 
+                                                                    className="hidden" 
+                                                                    accept="image/*"
+                                                                    onChange={(e) => {
+                                                                        if (e.target.files?.[0]) {
+                                                                            handleUploadForPair(qIndex, pIndex, 'left', e.target.files[0]);
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
@@ -463,14 +674,30 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <button
-                                                            onClick={() => handleGenerateImageForPair(qIndex, pIndex, 'right')}
-                                                            disabled={generatingImages[`${qIndex}-${pIndex}-right`]}
-                                                            className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
-                                                        >
-                                                            {generatingImages[`${qIndex}-${pIndex}-right`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                                            Gerar Imagem
-                                                        </button>
+                                                        <div className="flex gap-1">
+                                                            <button
+                                                                onClick={() => handleGenerateImageForPair(qIndex, pIndex, 'right')}
+                                                                disabled={generatingImages[`${qIndex}-${pIndex}-right`]}
+                                                                className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
+                                                            >
+                                                                {generatingImages[`${qIndex}-${pIndex}-right`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                                                Gerar
+                                                            </button>
+                                                            <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200">
+                                                                <ImageIcon className="w-3 h-3" />
+                                                                Subir
+                                                                <input 
+                                                                    type="file" 
+                                                                    className="hidden" 
+                                                                    accept="image/*"
+                                                                    onChange={(e) => {
+                                                                        if (e.target.files?.[0]) {
+                                                                            handleUploadForPair(qIndex, pIndex, 'right', e.target.files[0]);
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>

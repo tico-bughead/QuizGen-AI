@@ -43,7 +43,9 @@ export interface Question {
   id: number;
   type: QuestionType;
   text: string;
+  image?: string; // Image for the question statement
   options?: string[]; // For MC and TF
+  optionImages?: string[]; // Optional images for MC options, index-matched
   correctAnswerIndex?: number; // For MC and TF
   pairs?: MatchingPair[]; // For Matching
   explanation: string;
