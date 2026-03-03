@@ -24,6 +24,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
   const [isStoryMode, setIsStoryMode] = useState(false);
   const [playerList, setPlayerList] = useState<string[]>(['Jogador 1', 'Jogador 2']);
   const [arcadeMap, setArcadeMap] = useState<ArcadeMap>('overworld');
+  const [textualGenre, setTextualGenre] = useState('Dissertativo-argumentativo');
 
   const handleAddPlayer = () => {
       if (playerList.length < 4) {
@@ -124,7 +125,8 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
           playerNames,
           arcadeMap: gameMode === 'arcade' ? (isStoryMode ? 'overworld' : arcadeMap) : undefined,
           teachingStyle,
-          questionTypes: finalQuestionTypes
+          questionTypes: finalQuestionTypes,
+          textualGenre: (finalQuestionTypes.includes('ESSAY') || gameMode === 'essay_challenge') ? textualGenre : undefined
       });
     }
   };
@@ -203,6 +205,29 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                 ))}
               </div>
             </div>
+
+            {/* Textual Genre Input (Visible if ESSAY is selected or in Essay Challenge mode) */}
+            {(selectedQuestionTypes.includes('ESSAY') || gameMode === 'essay_challenge') && (
+                <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="space-y-3"
+                >
+                    <label htmlFor="textualGenre" className="block text-sm font-medium text-slate-700 flex items-center gap-2">
+                        <PenTool className="w-4 h-4 text-indigo-500" />
+                        Gênero Textual da Redação
+                        <Tooltip id="textualGenre" text="Especifique o gênero textual para a redação (Ex: Dissertativo-argumentativo, Carta, Artigo de Opinião)." />
+                    </label>
+                    <input
+                        id="textualGenre"
+                        type="text"
+                        value={textualGenre}
+                        onChange={(e) => setTextualGenre(e.target.value)}
+                        placeholder="Ex: Dissertativo-argumentativo, Artigo de Opinião..."
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none text-lg"
+                    />
+                </motion.div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Game Mode Selection */}

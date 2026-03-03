@@ -1,6 +1,34 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuizData, Difficulty, QuizConfig, EssayEvaluation } from "../types";
 
+export const generateImage = async (prompt: string, size: "512px" | "1K" | "2K" | "4K" = "1K"): Promise<string | null> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-image-preview",
+      contents: {
+        parts: [{ text: prompt }],
+      },
+      config: {
+        imageConfig: {
+            aspectRatio: "1:1",
+            imageSize: size
+        }
+      },
+    });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Erro ao gerar imagem:", error);
+    return null;
+  }
+};
+
 export const generateSpeech = async (text: string): Promise<string | null> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -17,8 +45,11 @@ export const generateSpeech = async (text: string): Promise<string | null> => {
       },
     });
 
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    return base64Audio || null;
+    const part = response.candidates?.[0]?.content?.parts?.[0];
+    if (part?.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+    }
+    return null;
   } catch (error) {
     console.error("Erro ao gerar áudio:", error);
     return null;
@@ -28,13 +59,15 @@ export const generateSpeech = async (text: string): Promise<string | null> => {
 export const evaluateEssay = async (
   questionText: string,
   userAnswer: string,
-  rubric?: string
+  rubric?: string,
+  textualGenre?: string
 ): Promise<EssayEvaluation> => {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const model = "gemini-2.5-flash";
 
   const prompt = `
     Avalie a seguinte resposta dissertativa para a questão: "${questionText}".
+    Gênero Textual esperado: "${textualGenre || 'Dissertativo-argumentativo'}"
     Resposta do aluno: "${userAnswer}"
     ${rubric ? `Rubrica de avaliação: ${rubric}` : ''}
 
@@ -114,13 +147,15 @@ export const evaluateEssay = async (
   }
 };
 
-export const generateEssayModel = async (topic: string): Promise<string> => {
+export const generateEssayModel = async (topic: string, genre?: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const model = "gemini-2.5-flash";
 
   const prompt = `
-    Escreva uma redação modelo nota 1000 (padrão ENEM) sobre o tema: "${topic}".
-    A redação deve ter título, introdução, desenvolvimento (2 parágrafos) e conclusão com proposta de intervenção.
+    Escreva uma redação modelo nota 1000 sobre o tema: "${topic}".
+    Gênero Textual: "${genre || 'Dissertativo-argumentativo'}".
+    A redação deve seguir as características típicas desse gênero.
+    Se for dissertativo-argumentativo, deve ter título, introdução, desenvolvimento (2 parágrafos) e conclusão com proposta de intervenção.
     O texto deve ser coeso, coerente e demonstrar domínio da norma culta.
   `;
 
@@ -140,12 +175,12 @@ export const generateEssayModel = async (topic: string): Promise<string> => {
   }
 };
 
-export const generateEssayTopic = async (): Promise<string> => {
+export const generateEssayTopic = async (genre?: string): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const model = "gemini-2.5-flash";
   
     const prompt = `
-      Gere um tema de redação atual e relevante para o ENEM ou vestibulares.
+      Gere um tema de redação atual e relevante para o gênero textual: "${genre || 'Dissertativo-argumentativo'}".
       Retorne APENAS o título do tema, sem aspas ou explicações.
       Exemplo: "Os desafios da mobilidade urbana no Brasil"
     `;
@@ -252,6 +287,11 @@ export const generateQuiz = async (
         - MULTIPLE_CHOICE: Pergunta com 4 opções e 1 correta.
         - TRUE_FALSE: Pergunta com opções "Verdadeiro" e "Falso".
         - MATCHING: 3 a 4 pares de conceitos para relacionar.
+          IMPORTANTE: Utilize imagens para tornar o quiz mais visual.
+          - Você pode definir 'leftIsImage: true' ou 'rightIsImage: true' para gerar imagens.
+          - Exemplo: Ligar uma imagem de um animal (leftIsImage: true) ao seu habitat (texto).
+          - Exemplo: Ligar um termo (texto) à sua definição (texto).
+          - Misture pares de texto-texto e imagem-texto.
         - FILL_IN_THE_BLANK: Uma frase com uma lacuna (___) e a resposta correta (única palavra ou termo curto).
         - ESSAY: Pergunta dissertativa que exige argumentação. Inclua 'essayRubric'.
       `;
@@ -279,6 +319,8 @@ export const generateQuiz = async (
     
     ${questionTypeInstruction}
     
+    ${config.textualGenre ? `Para as questões de redação (ESSAY), utilize o gênero textual: "${config.textualGenre}".` : ''}
+
     Diretrizes Gerais:
     - Certifique-se de que as perguntas sejam claras, as opções sejam plausíveis e a explicação seja útil.
     - O título do quiz deve ser criativo e relacionado ao tópico.
@@ -322,8 +364,10 @@ export const generateQuiz = async (
                     items: {
                         type: Type.OBJECT,
                         properties: {
-                            left: { type: Type.STRING },
-                            right: { type: Type.STRING }
+                            left: { type: Type.STRING, description: "Texto ou prompt da imagem para o lado esquerdo." },
+                            right: { type: Type.STRING, description: "Texto ou prompt da imagem para o lado direito." },
+                            leftIsImage: { type: Type.BOOLEAN, description: "Defina como true se o lado esquerdo deve ser uma imagem gerada a partir do texto em 'left'." },
+                            rightIsImage: { type: Type.BOOLEAN, description: "Defina como true se o lado direito deve ser uma imagem gerada a partir do texto em 'right'." }
                         },
                         required: ["left", "right"]
                     },
@@ -336,6 +380,10 @@ export const generateQuiz = async (
                   essayRubric: {
                       type: Type.STRING,
                       description: "Critérios de avaliação para a resposta dissertativa (apenas para ESSAY)."
+                  },
+                  textualGenre: {
+                      type: Type.STRING,
+                      description: "O gênero textual esperado para a redação (apenas para ESSAY)."
                   }
                 },
                 required: ["id", "type", "text", "explanation"],
@@ -349,6 +397,29 @@ export const generateQuiz = async (
 
     if (response.text) {
       const data = JSON.parse(response.text);
+      
+      // Post-process to generate images for MATCHING questions
+      await Promise.all(data.questions.map(async (q: any) => {
+          if (q.type === 'MATCHING' && q.pairs) {
+              await Promise.all(q.pairs.map(async (pair: any) => {
+                  if (pair.leftIsImage) {
+                      try {
+                          pair.leftImage = await generateImage(pair.left, "512px");
+                      } catch (e) {
+                          console.error("Failed to generate left image", e);
+                      }
+                  }
+                  if (pair.rightIsImage) {
+                      try {
+                          pair.rightImage = await generateImage(pair.right, "512px");
+                      } catch (e) {
+                          console.error("Failed to generate right image", e);
+                      }
+                  }
+              }));
+          }
+      }));
+
       return {
         ...data,
         topic: config.topic,

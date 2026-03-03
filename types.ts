@@ -19,6 +19,8 @@ export type PowerUpType = 'skip' | 'eliminate' | 'time_freeze';
 export interface MatchingPair {
   left: string;
   right: string;
+  leftImage?: string;
+  rightImage?: string;
 }
 
 export interface EssayEvaluation {
@@ -46,6 +48,7 @@ export interface Question {
   pairs?: MatchingPair[]; // For Matching
   explanation: string;
   essayRubric?: string; // Optional rubric for essay evaluation
+  textualGenre?: string; // Preferred textual genre for essay
 }
 
 export interface QuizData {
@@ -82,4 +85,5 @@ export interface QuizConfig {
   arcadeMap?: ArcadeMap;
   teachingStyle?: TeachingStyle;
   questionTypes?: QuestionType[];
+  textualGenre?: string; // Preferred textual genre for AI generation
 }

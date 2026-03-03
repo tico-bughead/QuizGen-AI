@@ -11,6 +11,7 @@ interface EssayTemplateGeneratorProps {
 
 export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ onBack }) => {
   const [topic, setTopic] = useState('');
+  const [textualGenre, setTextualGenre] = useState('Dissertativo-argumentativo');
   const [isLoadingTopic, setIsLoadingTopic] = useState(false);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
   const [generatedModel, setGeneratedModel] = useState<string | null>(null);
@@ -20,7 +21,7 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
     setIsLoadingTopic(true);
     setError(null);
     try {
-      const newTopic = await generateEssayTopic();
+      const newTopic = await generateEssayTopic(textualGenre);
       setTopic(newTopic);
       setGeneratedModel(null); // Reset model if topic changes
     } catch (err) {
@@ -35,7 +36,7 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
     setIsLoadingModel(true);
     setError(null);
     try {
-      const model = await generateEssayModel(topic);
+      const model = await generateEssayModel(topic, textualGenre);
       setGeneratedModel(model);
     } catch (err) {
       setError("Erro ao gerar modelo de redação. Tente novamente.");
@@ -195,7 +196,20 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
 
         <div className="space-y-6">
             <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-700">Tema da Redação</label>
+                <label className="block text-sm font-medium text-slate-700">Gênero Textual</label>
+                <input 
+                    type="text" 
+                    value={textualGenre}
+                    onChange={(e) => setTextualGenre(e.target.value)}
+                    placeholder="Ex: Dissertativo-argumentativo, Artigo de Opinião..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                />
+            </div>
+
+            <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-700">
+                    {textualGenre.toLowerCase().includes('dissertativo-argumentativo') ? 'Tema da Redação' : 'Título'}
+                </label>
                 <div className="flex gap-2">
                     <input 
                         type="text" 
@@ -204,7 +218,7 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
                             setTopic(e.target.value);
                             setGeneratedModel(null);
                         }}
-                        placeholder="Digite um tema ou gere um aleatório..."
+                        placeholder={textualGenre.toLowerCase().includes('dissertativo-argumentativo') ? "Digite um tema ou gere um aleatório..." : "Digite o título..."}
                         className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                     />
                     <Button 
@@ -214,7 +228,7 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
                         icon={<Sparkles className="w-4 h-4" />}
                         className="whitespace-nowrap"
                     >
-                        Gerar Tema
+                        {textualGenre.toLowerCase().includes('dissertativo-argumentativo') ? 'Gerar Tema' : 'Gerar Título'}
                     </Button>
                 </div>
             </div>
@@ -237,16 +251,18 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
                     <span className="text-xs text-slate-400 font-normal">PDF com pauta de 30 linhas</span>
                 </Button>
 
-                <Button 
-                    onClick={handleDownloadDraft}
-                    disabled={!topic.trim()}
-                    variant="outline"
-                    className="h-auto py-4 flex flex-col items-center gap-2 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 group"
-                >
-                    <PenTool className="w-8 h-8 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                    <span className="font-medium text-slate-700 group-hover:text-indigo-700">Baixar Rascunhão</span>
-                    <span className="text-xs text-slate-400 font-normal">Estrutura para planejamento</span>
-                </Button>
+                {textualGenre.toLowerCase().includes('dissertativo-argumentativo') && (
+                    <Button 
+                        onClick={handleDownloadDraft}
+                        disabled={!topic.trim()}
+                        variant="outline"
+                        className="h-auto py-4 flex flex-col items-center gap-2 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 group"
+                    >
+                        <PenTool className="w-8 h-8 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                        <span className="font-medium text-slate-700 group-hover:text-indigo-700">Baixar Rascunhão</span>
+                        <span className="text-xs text-slate-400 font-normal">Estrutura para planejamento</span>
+                    </Button>
+                )}
 
                 <Button 
                     onClick={handleGenerateModel}

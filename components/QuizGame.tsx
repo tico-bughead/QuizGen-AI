@@ -91,6 +91,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
 
   const [isAnswerChecked, setIsAnswerChecked] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false); // Estado para animação entre perguntas
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   
   // Estado para as cortinas do Modo TV
   // Se for TV, começa fechada (false) para abrir. Se não for TV, começa aberta (true).
@@ -218,6 +219,30 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
       window.speechSynthesis.cancel();
     };
   }, []);
+
+  // TTS Effect
+  useEffect(() => {
+      // Stop previous speech
+      if (currentAudioRef.current) {
+          currentAudioRef.current.pause();
+          currentAudioRef.current = null;
+      }
+      setIsPlayingAudio(false);
+
+      if (question.type !== 'MATCHING' && soundEnabled && !isTransitioning) {
+          generateSpeech(question.text).then(audioUrl => {
+              // Check if we are still on the same question and component is mounted
+              if (audioUrl) {
+                  const audio = new Audio(audioUrl);
+                  audio.volume = 1.0;
+                  audio.play().catch(e => console.log("Auto-play blocked", e));
+                  currentAudioRef.current = audio;
+                  setIsPlayingAudio(true);
+                  audio.onended = () => setIsPlayingAudio(false);
+              }
+          });
+      }
+  }, [currentQuestionIndex, question, soundEnabled, isTransitioning]);
 
   // Efeito de abertura das cortinas no início (apenas Modo TV)
   useEffect(() => {
@@ -396,7 +421,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
           if (!essayAnswer.trim()) return;
           setIsEvaluating(true);
           try {
-              const evaluation = await evaluateEssay(question.text, essayAnswer, question.essayRubric);
+              const evaluation = await evaluateEssay(question.text, essayAnswer, question.essayRubric, question.textualGenre);
               setEssayEvaluation(evaluation);
               setAllEssayEvaluations(prev => ({ ...prev, [question.id]: evaluation }));
               setIsAnswerChecked(true);
@@ -1074,8 +1099,31 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
         <div className={`${styles.card} ${isTimeout ? styles.cardTimeUp : ''} rounded-[2.5rem] p-4 sm:p-6 md:p-10 relative overflow-hidden transition-all duration-300 flex flex-col`}>
           
           <div className={`transition-all duration-300 ease-in-out transform w-full flex flex-col ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-            <h2 className={`${styles.title} font-bold ${styles.textMain} mb-2 leading-relaxed`}>
+            <h2 className={`${styles.title} font-bold ${styles.textMain} mb-2 leading-relaxed flex items-center justify-center gap-2`}>
                 {question.text}
+                {question.type !== 'MATCHING' && (
+                    <button 
+                        onClick={() => {
+                            if (isPlayingAudio && currentAudioRef.current) {
+                                currentAudioRef.current.pause();
+                                setIsPlayingAudio(false);
+                            } else {
+                                generateSpeech(question.text).then(audioUrl => {
+                                    if (audioUrl) {
+                                        const audio = new Audio(audioUrl);
+                                        audio.play();
+                                        currentAudioRef.current = audio;
+                                        setIsPlayingAudio(true);
+                                        audio.onended = () => setIsPlayingAudio(false);
+                                    }
+                                });
+                            }
+                        }}
+                        className={`p-2 rounded-full transition-colors ${isPlayingAudio ? 'text-indigo-500 bg-indigo-100' : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100'}`}
+                    >
+                        {isPlayingAudio ? <Volume2 className="w-5 h-5 animate-pulse" /> : <Volume2 className="w-5 h-5" />}
+                    </button>
+                )}
             </h2>
             {question.type === 'MATCHING' && !isAnswerChecked && (
                 <p className={`${styles.textSec} text-sm mb-6 italic`}>
@@ -1095,13 +1143,16 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                                   key={`left-${idx}`}
                                   onClick={() => handleMatchingSelect(pair.left, 'left')}
                                   disabled={isMatched || isAnswerChecked}
-                                  className={`w-full p-4 rounded-3xl text-left transition-all border-2 ${
+                                  className={`w-full p-4 rounded-3xl text-left transition-all border-2 flex flex-col items-center gap-2 ${
                                       isMatched ? 'opacity-0 pointer-events-none' : 
                                       isSelected ? 'border-indigo-500 bg-indigo-100 text-indigo-900' : 
                                       styles.optDefault
                                   }`}
                                 >
-                                    {pair.left}
+                                    {pair.leftImage && (
+                                        <img src={pair.leftImage} alt="Item" className="w-full h-32 object-cover rounded-xl" />
+                                    )}
+                                    <span className="text-center font-medium">{pair.left}</span>
                                 </button>
                             );
                         })}
@@ -1110,17 +1161,21 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                         {shuffledRightOptions.map((text, idx) => {
                             const originalLeft = rightOptionMap[text];
                             const isMatched = matchedPairs.includes(originalLeft);
+                            const pair = question.pairs?.find(p => p.left === originalLeft);
                             return (
                               <button
                                   key={`right-${idx}`}
                                   onClick={() => handleMatchingSelect(text, 'right')}
                                   disabled={isMatched || isAnswerChecked}
-                                  className={`w-full p-4 rounded-3xl text-left transition-all border-2 ${
+                                  className={`w-full p-4 rounded-3xl text-left transition-all border-2 flex flex-col items-center gap-2 ${
                                       isMatched ? 'opacity-0 pointer-events-none' : 
                                       styles.optDefault
                                   }`}
                                 >
-                                    {text}
+                                    {pair?.rightImage && (
+                                        <img src={pair.rightImage} alt="Match" className="w-full h-32 object-cover rounded-xl" />
+                                    )}
+                                    <span className="text-center font-medium">{text}</span>
                                 </button>
                             );
                         })}
@@ -1159,7 +1214,8 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                                 doc.setFontSize(16);
                                 doc.text("Folha de Redação", 105, 20, { align: "center" });
                                 doc.setFontSize(12);
-                                doc.text(`Tema: ${question.text}`, 20, 30);
+                                const isDissertativo = !question.textualGenre || question.textualGenre.toLowerCase().includes('dissertativo-argumentativo');
+                                doc.text(`${isDissertativo ? 'Tema' : 'Título'}: ${question.text}`, 20, 30);
                                 
                                 // Lines
                                 let y = 50;
@@ -1182,7 +1238,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                         </Button>
                     </div>
 
-                    {essayPhase === 'DRAFT' ? (
+                    {essayPhase === 'DRAFT' && (!question.textualGenre || question.textualGenre.toLowerCase().includes('dissertativo-argumentativo')) ? (
                         <div className="space-y-4 bg-white/50 p-4 rounded-2xl border border-slate-200">
                             <div className="flex justify-between items-center mb-2">
                                 <h3 className="font-bold text-lg text-slate-700 flex items-center gap-2">
@@ -1267,44 +1323,46 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Draft View (Sidebar on Desktop, Top on Mobile) */}
-                            <div className="md:col-span-1 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs overflow-y-auto max-h-[300px] md:max-h-[500px]">
-                                <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-1">
-                                    <PenTool className="w-3 h-3" /> Seu Rascunho
-                                </h4>
-                                <div className="space-y-3 text-slate-600">
-                                    <div>
-                                        <strong className="block text-indigo-600">Intro:</strong>
-                                        <p>X: {essayDraft.introProblemX || '-'}</p>
-                                        <p>Y: {essayDraft.introProblemY || '-'}</p>
+                            {(!question.textualGenre || question.textualGenre.toLowerCase().includes('dissertativo-argumentativo')) && (
+                                <div className="md:col-span-1 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs overflow-y-auto max-h-[300px] md:max-h-[500px]">
+                                    <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-1">
+                                        <PenTool className="w-3 h-3" /> Seu Rascunho
+                                    </h4>
+                                    <div className="space-y-3 text-slate-600">
+                                        <div>
+                                            <strong className="block text-indigo-600">Intro:</strong>
+                                            <p>X: {essayDraft.introProblemX || '-'}</p>
+                                            <p>Y: {essayDraft.introProblemY || '-'}</p>
+                                        </div>
+                                        <div>
+                                            <strong className="block text-indigo-600">D1:</strong>
+                                            <p>Arg: {essayDraft.d1Argument || '-'}</p>
+                                            <p>Rep: {essayDraft.d1Repertoire || '-'}</p>
+                                        </div>
+                                        <div>
+                                            <strong className="block text-indigo-600">D2:</strong>
+                                            <p>Arg: {essayDraft.d2Argument || '-'}</p>
+                                            <p>Rep: {essayDraft.d2Repertoire || '-'}</p>
+                                        </div>
+                                        <div>
+                                            <strong className="block text-indigo-600">Conclusão:</strong>
+                                            <p>Agente: {essayDraft.conclusionAgent || '-'}</p>
+                                            <p>Ação: {essayDraft.conclusionAction || '-'}</p>
+                                            <p>Modo: {essayDraft.conclusionMode || '-'}</p>
+                                            <p>Finalidade: {essayDraft.conclusionPurpose || '-'}</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => setEssayPhase('DRAFT')}
+                                            className="text-indigo-500 underline mt-2 hover:text-indigo-700"
+                                        >
+                                            Editar Rascunho
+                                        </button>
                                     </div>
-                                    <div>
-                                        <strong className="block text-indigo-600">D1:</strong>
-                                        <p>Arg: {essayDraft.d1Argument || '-'}</p>
-                                        <p>Rep: {essayDraft.d1Repertoire || '-'}</p>
-                                    </div>
-                                    <div>
-                                        <strong className="block text-indigo-600">D2:</strong>
-                                        <p>Arg: {essayDraft.d2Argument || '-'}</p>
-                                        <p>Rep: {essayDraft.d2Repertoire || '-'}</p>
-                                    </div>
-                                    <div>
-                                        <strong className="block text-indigo-600">Conclusão:</strong>
-                                        <p>Agente: {essayDraft.conclusionAgent || '-'}</p>
-                                        <p>Ação: {essayDraft.conclusionAction || '-'}</p>
-                                        <p>Modo: {essayDraft.conclusionMode || '-'}</p>
-                                        <p>Finalidade: {essayDraft.conclusionPurpose || '-'}</p>
-                                    </div>
-                                    <button 
-                                        onClick={() => setEssayPhase('DRAFT')}
-                                        className="text-indigo-500 underline mt-2 hover:text-indigo-700"
-                                    >
-                                        Editar Rascunho
-                                    </button>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Final Essay Textarea */}
-                            <div className="md:col-span-2">
+                            <div className={(!question.textualGenre || question.textualGenre.toLowerCase().includes('dissertativo-argumentativo')) ? "md:col-span-2" : "md:col-span-3"}>
                                 <textarea
                                     value={essayAnswer}
                                     onChange={(e) => setEssayAnswer(e.target.value)}

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { QuizData, Question, Difficulty, QuizTheme, GameMode, QuestionType } from '../types';
 import { Button } from './Button';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Save, ArrowLeft, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, CheckCircle2, AlertCircle, ArrowRight, Image as ImageIcon, Sparkles, Loader2 } from 'lucide-react';
+import { generateImage } from '../services/geminiService';
 
 interface QuizCreatorProps {
   onSave: (quizData: QuizData) => void;
@@ -23,6 +24,45 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
       explanation: ''
     }
   ]);
+
+  const [generatingImages, setGeneratingImages] = useState<Record<string, boolean>>({});
+
+  const handleGenerateImageForPair = async (qIndex: number, pIndex: number, side: 'left' | 'right') => {
+    const question = questions[qIndex];
+    const pair = question.pairs?.[pIndex];
+    if (!pair) return;
+
+    const text = side === 'left' ? pair.left : pair.right;
+    if (!text.trim()) {
+        alert("Digite um texto para gerar a imagem.");
+        return;
+    }
+
+    const key = `${qIndex}-${pIndex}-${side}`;
+    setGeneratingImages(prev => ({ ...prev, [key]: true }));
+
+    try {
+        const imageUrl = await generateImage(text, "512px"); // Use smaller size for matching cards
+        if (imageUrl) {
+            const field = side === 'left' ? 'leftImage' : 'rightImage';
+            // Update pair
+            const newQuestions = [...questions];
+            const newPairs = [...(newQuestions[qIndex].pairs || [])];
+            newPairs[pIndex] = { ...newPairs[pIndex], [field]: imageUrl };
+            newQuestions[qIndex].pairs = newPairs;
+            setQuestions(newQuestions);
+        }
+    } catch (error) {
+        console.error("Error generating image:", error);
+        alert("Erro ao gerar imagem. Tente novamente.");
+    } finally {
+        setGeneratingImages(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
+    }
+  };
 
   const handleAddQuestion = () => {
     setQuestions([
@@ -62,26 +102,31 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
         q.correctAnswerIndex = 0;
         q.pairs = undefined;
         q.essayRubric = undefined;
+        q.textualGenre = undefined;
     } else if (newType === 'FILL_IN_THE_BLANK') {
         q.options = [''];
         q.correctAnswerIndex = undefined;
         q.pairs = undefined;
         q.essayRubric = undefined;
+        q.textualGenre = undefined;
     } else if (newType === 'MATCHING') {
         q.pairs = [{ left: '', right: '' }, { left: '', right: '' }]; // Start with 2 pairs
         q.options = undefined;
         q.correctAnswerIndex = undefined;
         q.essayRubric = undefined;
+        q.textualGenre = undefined;
     } else if (newType === 'MULTIPLE_CHOICE') {
         q.options = ['', '', '', ''];
         q.correctAnswerIndex = 0;
         q.pairs = undefined;
         q.essayRubric = undefined;
+        q.textualGenre = undefined;
     } else if (newType === 'ESSAY') {
         q.options = undefined;
         q.correctAnswerIndex = undefined;
         q.pairs = undefined;
         q.essayRubric = '';
+        q.textualGenre = 'Dissertativo-argumentativo';
     }
     
     setQuestions(newQuestions);
@@ -266,6 +311,20 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                             <div className="flex-grow"></div>
                         </div>
 
+                        {/* ESSAY GENRE */}
+                        {q.type === 'ESSAY' && (
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-slate-700">Gênero Textual</label>
+                                <input 
+                                    type="text"
+                                    value={q.textualGenre || ''}
+                                    onChange={(e) => handleQuestionChange(qIndex, 'textualGenre', e.target.value)}
+                                    placeholder="Ex: Dissertativo-argumentativo, Artigo de Opinião, Carta..."
+                                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm"
+                                />
+                            </div>
+                        )}
+
                         <input
                           type="text"
                           value={q.text}
@@ -337,30 +396,89 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                         {q.type === 'MATCHING' && (
                             <div className="space-y-3 bg-slate-100/50 p-4 rounded-2xl border border-slate-200">
                                 <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Pares (Item → Correspondência)</label>
-                                <div className="space-y-2">
+                                <div className="space-y-4">
                                     {q.pairs?.map((pair, pIndex) => (
-                                        <div key={pIndex} className="flex gap-2 items-center">
-                                            <div className="flex-1">
+                                        <div key={pIndex} className="flex gap-2 items-start">
+                                            <div className="flex-1 space-y-2">
                                                 <input 
                                                     placeholder="Item (Ex: Brasil)" 
                                                     value={pair.left} 
                                                     onChange={(e) => handlePairChange(qIndex, pIndex, 'left', e.target.value)}
                                                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                                 />
+                                                <div className="flex gap-2 items-center">
+                                                    {pair.leftImage ? (
+                                                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group/img">
+                                                            <img src={pair.leftImage} alt="Left" className="w-full h-full object-cover" />
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newQuestions = [...questions];
+                                                                    const newPairs = [...(newQuestions[qIndex].pairs || [])];
+                                                                    newPairs[pIndex] = { ...newPairs[pIndex], leftImage: undefined };
+                                                                    newQuestions[qIndex].pairs = newPairs;
+                                                                    setQuestions(newQuestions);
+                                                                }}
+                                                                className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity text-white"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleGenerateImageForPair(qIndex, pIndex, 'left')}
+                                                            disabled={generatingImages[`${qIndex}-${pIndex}-left`]}
+                                                            className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
+                                                        >
+                                                            {generatingImages[`${qIndex}-${pIndex}-left`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                                            Gerar Imagem
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <ArrowRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                                            <div className="flex-1">
+                                            
+                                            <ArrowRight className="w-4 h-4 text-slate-400 flex-shrink-0 mt-3" />
+                                            
+                                            <div className="flex-1 space-y-2">
                                                 <input 
                                                     placeholder="Correspondência (Ex: Brasília)" 
                                                     value={pair.right} 
                                                     onChange={(e) => handlePairChange(qIndex, pIndex, 'right', e.target.value)}
                                                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                                 />
+                                                 <div className="flex gap-2 items-center">
+                                                    {pair.rightImage ? (
+                                                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group/img">
+                                                            <img src={pair.rightImage} alt="Right" className="w-full h-full object-cover" />
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newQuestions = [...questions];
+                                                                    const newPairs = [...(newQuestions[qIndex].pairs || [])];
+                                                                    newPairs[pIndex] = { ...newPairs[pIndex], rightImage: undefined };
+                                                                    newQuestions[qIndex].pairs = newPairs;
+                                                                    setQuestions(newQuestions);
+                                                                }}
+                                                                className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity text-white"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleGenerateImageForPair(qIndex, pIndex, 'right')}
+                                                            disabled={generatingImages[`${qIndex}-${pIndex}-right`]}
+                                                            className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
+                                                        >
+                                                            {generatingImages[`${qIndex}-${pIndex}-right`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                                            Gerar Imagem
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
+                                            
                                             <button 
                                                 onClick={() => handleRemovePair(qIndex, pIndex)}
                                                 disabled={(q.pairs?.length || 0) <= 2}
-                                                className={`p-2 rounded-lg transition-colors ${
+                                                className={`p-2 rounded-lg transition-colors mt-1 ${
                                                     (q.pairs?.length || 0) <= 2 
                                                         ? 'text-slate-300 cursor-not-allowed' 
                                                         : 'text-red-400 hover:bg-red-50 hover:text-red-600'
@@ -374,7 +492,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                 {(q.pairs?.length || 0) < 5 && (
                                     <button 
                                         onClick={() => handleAddPair(qIndex)}
-                                        className="text-xs flex items-center gap-1 text-indigo-600 font-medium hover:text-indigo-800 px-2 py-1 rounded hover:bg-indigo-50 transition-colors"
+                                        className="text-xs flex items-center gap-1 text-indigo-600 font-medium hover:text-indigo-800 px-2 py-1 rounded hover:bg-indigo-50 transition-colors mt-2"
                                     >
                                         <Plus className="w-3 h-3" /> Adicionar Par
                                     </button>
