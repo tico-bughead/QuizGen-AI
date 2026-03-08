@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from './Button';
-import { BrainCircuit, Sparkles, Gamepad2, Users, Trophy, ArrowRight, PenTool } from 'lucide-react';
+import { BrainCircuit, Sparkles, Gamepad2, Users, Trophy, ArrowRight, PenTool, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface HomePageProps {
@@ -12,6 +12,19 @@ interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate, onEssayGenerator }) => {
   return (
     <div className="max-w-4xl mx-auto w-full">
+      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8 rounded-r-xl shadow-md mx-4 sm:mx-0">
+        <div className="flex items-center">
+          <div className="flex-shrink-0">
+            <AlertCircle className="h-6 w-6 text-yellow-600" aria-hidden="true" />
+          </div>
+          <div className="ml-3">
+            <p className="text-sm sm:text-base text-yellow-800 font-bold uppercase tracking-wide">
+              AS FUNÇÕES DE IA SÓ FUNCIONARÃO SE RODADAS LOCALMENTE COM SUA CHAVE DE API
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="text-center mb-12">
         <motion.div
           initial={{ scale: 0.5, opacity: 0 }}
