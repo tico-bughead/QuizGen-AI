@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import { QuizData, UserAnswers, Difficulty, QuizTheme, Question, MatchingPair, EssayEvaluation } from '../types';
 import { Button } from './Button';
-import { ChevronRight, CheckCircle2, Timer, AlertCircle, XCircle, Volume2, VolumeX, SkipForward, Heart, Zap, Shield, Hourglass, Trophy, PenTool, Loader2, Download } from 'lucide-react';
+import { ChevronRight, CheckCircle2, Timer, AlertCircle, XCircle, Volume2, VolumeX, SkipForward, Heart, Zap, Shield, Hourglass, Trophy, TrendingUp, PenTool, Loader2, Download } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
 interface QuizGameProps {
@@ -57,6 +58,21 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [answers, setAnswers] = useState<UserAnswers>({});
+
+  if (!quiz.questions || quiz.questions.length === 0) {
+    return (
+      <div className="max-w-md mx-auto w-full bg-white p-8 rounded-2xl shadow-xl text-center">
+        <div className="mx-auto w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+          <AlertCircle className="w-6 h-6 text-amber-600" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">Quiz sem perguntas</h2>
+        <p className="text-slate-500 mb-6">Não foi possível carregar as perguntas deste quiz.</p>
+        <Button onClick={() => window.location.reload()} fullWidth>
+          Voltar ao Início
+        </Button>
+      </div>
+    );
+  }
   
   // Essay State
   const [essayDraft, setEssayDraft] = useState<EssayDraft>({
@@ -70,6 +86,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   // Game State
   const [lives, setLives] = useState(3);
   const [score, setScore] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
   // Multiplayer State
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const playerNames = quiz.playerNames || ['Jogador 1', 'Jogador 2'];
@@ -81,6 +98,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
     timeFreeze: 1
   });
   const [isFrozen, setIsFrozen] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [eliminatedOptions, setEliminatedOptions] = useState<number[]>([]);
 
   // Matching Question State
@@ -97,14 +115,23 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   // Se for TV, começa fechada (false) para abrir. Se não for TV, começa aberta (true).
   const [areCurtainsOpen, setAreCurtainsOpen] = useState(!quiz.isTvMode);
   
-  const question = quiz.questions[currentQuestionIndex];
+  const question = quiz.questions[currentQuestionIndex] || { text: "Pergunta não encontrada", type: "MULTIPLE_CHOICE", explanation: "" } as Question;
   const totalQuestions = quiz.questions.length;
+
+  useEffect(() => {
+    console.log("QuizGame - Current Question:", question);
+    console.log("QuizGame - isTransitioning:", isTransitioning);
+  }, [currentQuestionIndex, question, isTransitioning]);
 
   const getQuestionTimeLimit = () => {
       if (quiz.gameMode === 'training') return 9999; // Effectively infinite
       if (quiz.gameMode === 'speed_run') return 60;
       if (question.type === 'ESSAY') return 300; // 5 minutes for essay
-      return TIME_LIMITS[quiz.difficulty];
+      
+      const baseLimit = TIME_LIMITS[quiz.difficulty];
+      // Reduz o tempo em 5% para cada resposta correta (mínimo de 5 segundos)
+      const reductionFactor = Math.pow(0.95, correctCount);
+      return Math.max(5, Math.floor(baseLimit * reductionFactor));
   };
 
   const timeLimit = getQuestionTimeLimit();
@@ -266,22 +293,24 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   // Reset State on Question Change
   useEffect(() => {
     if (quiz.gameMode !== 'speed_run') {
-        setTimeLeft(timeLimit);
+        setTimeLeft(getQuestionTimeLimit());
         setIsTimeUp(false);
     }
     setSelectedOption(null);
     setIsAnswerChecked(false);
     setIsFrozen(false);
+    setIsVideoPlaying(false);
     setFillInBlankAnswer('');
     setEssayAnswer('');
     setIsEvaluating(false);
     setEssayEvaluation(null);
-  }, [currentQuestionIndex, timeLimit, quiz.gameMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuestionIndex, quiz.gameMode]);
 
   // Countdown Logic
   useEffect(() => {
     // Se as cortinas estiverem fechadas (transição inicial), não conta o tempo
-    if ((isAnswerChecked && quiz.gameMode !== 'speed_run') || isTimeUp || !areCurtainsOpen || isFrozen) return;
+    if ((isAnswerChecked && quiz.gameMode !== 'speed_run') || isTimeUp || !areCurtainsOpen || isFrozen || isVideoPlaying) return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -291,7 +320,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isAnswerChecked, isTimeUp, quiz.isTvMode, soundEnabled, areCurtainsOpen, isFrozen, quiz.gameMode]);
+  }, [isAnswerChecked, isTimeUp, quiz.isTvMode, soundEnabled, areCurtainsOpen, isFrozen, isVideoPlaying, quiz.gameMode]);
 
   // Handle Time Up
   useEffect(() => {
@@ -364,14 +393,14 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
               if (newMatchedPairs.length === (question.pairs?.length || 0)) {
                   // All done!
                   setIsAnswerChecked(true);
-                  if (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') {
-                      setScore(s => s + 500);
-                  } else if (quiz.isMultiplayer) {
+                  if (quiz.isMultiplayer) {
                       setPlayerScores(prev => {
                           const newScores = [...prev];
                           newScores[currentPlayerIndex] += 500;
                           return newScores;
                       });
+                  } else if (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') {
+                      setScore(s => s + 500);
                   }
                   setAnswers(prev => ({ ...prev, [question.id]: 1 })); // 1 for correct
               }
@@ -428,23 +457,26 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
               
               // Score logic for Essay
               const points = evaluation.score;
+              const bonusMultiplier = 1 + (correctCount * 0.1);
+              const finalPoints = Math.floor(points * bonusMultiplier);
               
-              if (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') {
-                  setScore(s => s + points * 5); // Max 500
-              } else if (quiz.isMultiplayer) {
+              if (quiz.isMultiplayer) {
                   setPlayerScores(prev => {
                       const newScores = [...prev];
-                      newScores[currentPlayerIndex] += points;
+                      newScores[currentPlayerIndex] += (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') ? finalPoints * 5 : finalPoints;
                       return newScores;
                   });
+              } else if (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') {
+                  setScore(s => s + finalPoints * 5); // Max 500 * multiplier
               } else {
-                  setScore(s => s + points);
+                  setScore(s => s + finalPoints);
               }
               
               setAnswers(prev => ({ ...prev, [question.id]: essayAnswer }));
               
               if (points >= 60) {
                   playSound('correct');
+                  setCorrectCount(c => c + 1);
               } else {
                   playSound('wrong');
                   if (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') {
@@ -483,16 +515,17 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
       // Play Sound Effects
       if (isCorrect) {
         playSound('correct');
-        if (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show') {
-            setScore(s => s + 100);
-        } else if (quiz.isMultiplayer) {
+        setCorrectCount(c => c + 1);
+        const bonus = Math.floor(100 * (1 + (correctCount * 0.1)));
+        
+        if (quiz.isMultiplayer) {
             setPlayerScores(prev => {
                 const newScores = [...prev];
-                newScores[currentPlayerIndex] += 100;
+                newScores[currentPlayerIndex] += bonus;
                 return newScores;
             });
-        } else if (quiz.gameMode === 'speed_run') {
-            setScore(s => s + 100);
+        } else if (quiz.gameMode === 'arcade' || quiz.gameMode === 'tv_show' || quiz.gameMode === 'speed_run') {
+            setScore(s => s + bonus);
         }
       } else {
         playSound('wrong');
@@ -518,6 +551,8 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   }, [isAnswerChecked, quiz.gameMode]);
 
   const handleNextQuestion = () => {
+      if (isTransitioning) return;
+
       // Stop current sound immediately when moving next
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
@@ -859,21 +894,13 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
       ? answers[question.id] === 1 
       : question.type === 'FILL_IN_THE_BLANK'
           ? (typeof answers[question.id] === 'string' && (question.options?.[0]?.toLowerCase() === answers[question.id].trim().toLowerCase()))
-          : selectedOption === question.correctAnswerIndex;
+          : question.type === 'ESSAY'
+              ? (allEssayEvaluations[question.id] && allEssayEvaluations[question.id].score >= 60)
+              : selectedOption === question.correctAnswerIndex;
 
-  const isTimeout = isTimeUp && (
-      question.type === 'MATCHING' ? answers[question.id] === undefined : 
-      question.type === 'FILL_IN_THE_BLANK' ? !isAnswerChecked :
-      selectedOption === null
-  );
+  const isTimeout = isTimeUp && !isAnswerChecked;
   
-  const isSkipped = !isTimeUp && isAnswerChecked && (
-      question.type === 'MATCHING' 
-          ? answers[question.id] === -1 
-          : question.type === 'FILL_IN_THE_BLANK'
-              ? answers[question.id] === ''
-              : selectedOption === null
-  );
+  const isSkipped = !isTimeUp && isAnswerChecked && answers[question.id] === -1;
 
   return (
     <div className={`w-full transition-colors duration-500 ${styles.wrapper}`}>
@@ -927,6 +954,17 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                              <span className="font-bold text-yellow-400 uppercase tracking-wider text-sm hidden sm:inline">Speed Run</span>
                         </div>
                     ) : null}
+
+                    {/* Difficulty Progression Indicator */}
+                    <motion.div 
+                        key={correctCount}
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="hidden sm:flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/10"
+                    >
+                        <TrendingUp className="w-4 h-4 text-yellow-400" />
+                        <span className="text-[10px] font-bold uppercase tracking-tighter">Dificuldade x{(1 + (correctCount * 0.1)).toFixed(1)}</span>
+                    </motion.div>
                 </div>
 
                 <div className={`font-mono font-bold text-2xl ${styles.hud?.text || 'text-yellow-400'}`}>
@@ -1100,6 +1138,18 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
           
           <div className={`transition-all duration-300 ease-in-out transform w-full flex flex-col ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
             <h2 className={`${styles.title} font-bold ${styles.textMain} mb-2 leading-relaxed flex flex-col items-center justify-center gap-4`}>
+                {question.video && (
+                    <div className="w-full max-w-md aspect-video rounded-2xl overflow-hidden shadow-lg border-4 border-white/20 bg-black">
+                        <video 
+                            src={question.video} 
+                            controls 
+                            className="w-full h-full object-contain"
+                            onPlay={() => setIsVideoPlaying(true)}
+                            onPause={() => setIsVideoPlaying(false)}
+                            onEnded={() => setIsVideoPlaying(false)}
+                        />
+                    </div>
+                )}
                 {question.image && (
                     <img src={question.image} alt="Question" className="w-full max-w-md h-48 sm:h-64 object-cover rounded-2xl shadow-lg border-4 border-white/20" />
                 )}
@@ -1212,7 +1262,6 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                 <div className="w-full space-y-4">
                     <div className="flex justify-end gap-2">
                         <Button 
-                            size="sm" 
                             variant="outline" 
                             onClick={() => {
                                 const doc = new jsPDF();
@@ -1535,11 +1584,11 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                    <Button
                       variant="ghost"
                       onClick={handleSkip}
-                      disabled={(quiz.gameMode === 'multiplayer' || quiz.gameMode === 'arcade') && powerUps.skip <= 0}
+                      disabled={(quiz.isMultiplayer || quiz.gameMode === 'arcade') && powerUps.skip <= 0}
                       className={quiz.isTvMode ? 'text-white/70 hover:text-white hover:bg-white/10' : ''}
                       icon={<SkipForward className="w-4 h-4" />}
                    >
-                     {(quiz.gameMode === 'multiplayer' || quiz.gameMode === 'arcade') ? `Pular (${powerUps.skip})` : 'Pular'}
+                     {(quiz.isMultiplayer || quiz.gameMode === 'arcade') ? `Pular (${powerUps.skip})` : 'Pular'}
                    </Button>
                 )}
 

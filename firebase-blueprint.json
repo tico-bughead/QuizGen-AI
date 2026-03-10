@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the application",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The user's unique ID" },
+        "email": { "type": "string", "description": "The user's email address" },
+        "displayName": { "type": "string", "description": "The user's display name" },
+        "photoURL": { "type": "string", "description": "The user's profile picture URL" },
+        "createdAt": { "type": "timestamp", "description": "When the user was created" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "QuizResult": {
+      "title": "QuizResult",
+      "description": "A completed quiz result",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The ID of the user who took the quiz" },
+        "topic": { "type": "string", "description": "The topic of the quiz" },
+        "score": { "type": "number", "description": "The score achieved" },
+        "totalQuestions": { "type": "number", "description": "Total number of questions" },
+        "createdAt": { "type": "timestamp", "description": "When the quiz was completed" }
+      },
+      "required": ["userId", "topic", "score", "totalQuestions", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A chat message in the AI chatbot",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The ID of the user" },
+        "role": { "type": "string", "enum": ["user", "model"], "description": "The role of the sender" },
+        "text": { "type": "string", "description": "The message text" },
+        "createdAt": { "type": "timestamp", "description": "When the message was sent" }
+      },
+      "required": ["userId", "role", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/quizResults/{resultId}": {
+      "schema": { "$ref": "#/entities/QuizResult" },
+      "description": "Quiz results for users"
+    },
+    "/chatMessages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Chat messages for users"
+    }
+  }
+}

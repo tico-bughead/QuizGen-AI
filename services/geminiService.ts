@@ -1,58 +1,92 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { QuizData, Difficulty, QuizConfig, EssayEvaluation } from "../types";
 
-export const generateImage = async (prompt: string, size: "512px" | "1K" | "2K" | "4K" = "1K"): Promise<string | null> => {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-image",
-      contents: {
-        parts: [{ text: prompt }],
-      },
-      config: {
-        imageConfig: {
-            aspectRatio: "1:1",
-            // imageSize is not supported in gemini-2.5-flash-image
-        }
-      },
-    });
+const API_KEY = process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+const IS_OPENROUTER = !!process.env.OPENROUTER_API_KEY;
+const BASE_URL = IS_OPENROUTER ? "https://openrouter.ai/api/v1" : "https://generativelanguage.googleapis.com/v1beta";
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error("Erro ao gerar imagem:", error);
-    return null;
-  }
+export const generateImage = async (prompt: string, size: "512px" | "1K" | "2K" | "4K" = "1K"): Promise<string | null> => {
+  // Image generation disabled by user request
+  return null;
 };
 
 export const generateSpeech = async (text: string): Promise<string | null> => {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' }, // 'Kore' is generally calm and clear
-          },
-        },
-      },
-    });
+  // OpenRouter doesn't have a direct TTS endpoint. 
+  // We'll return null and the UI can handle it or we could use a different service.
+  // For now, let's log that it's not supported with OpenRouter.
+  console.warn("TTS não é suportado diretamente via OpenRouter.");
+  return null;
+};
 
-    const part = response.candidates?.[0]?.content?.parts?.[0];
-    if (part?.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+const callOpenRouter = async (prompt: string, systemInstruction: string, responseSchema?: any) => {
+  if (!API_KEY) throw new Error("API Key não configurada.");
+
+  const model = IS_OPENROUTER ? "google/gemma-2-9b-it:free" : "gemini-3-flash-preview";
+  const url = IS_OPENROUTER ? `${BASE_URL}/chat/completions` : `${BASE_URL}/models/${model}:generateContent?key=${API_KEY}`;
+
+  const messages = [
+    { role: "system", content: systemInstruction },
+    { role: "user", content: prompt }
+  ];
+
+  if (responseSchema) {
+    messages[1].content += `\n\nRetorne a resposta estritamente no formato JSON seguindo este esquema: ${JSON.stringify(responseSchema)}`;
+  }
+
+  try {
+    let content = "";
+
+    if (IS_OPENROUTER) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "Quiz AI Master"
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: messages,
+          response_format: responseSchema ? { type: "json_object" } : undefined,
+          temperature: 0.7
+        })
+      });
+
+      const text = await response.text();
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = JSON.parse(text);
+        } catch (e) {
+          errorData = { error: { message: text } };
+        }
+        throw new Error(errorData.error?.message || `Erro na chamada ao OpenRouter: ${response.status}`);
+      }
+
+      const data = JSON.parse(text);
+      content = data.choices[0].message.content;
+    } else {
+      // Direct Gemini API
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${systemInstruction}\n\n${prompt}${responseSchema ? `\n\nResponda em JSON seguindo este esquema: ${JSON.stringify(responseSchema)}` : ''}` }] }],
+          generationConfig: responseSchema ? { responseMimeType: "application/json" } : undefined
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error?.message || `Erro na chamada ao Gemini: ${response.status}`);
+      }
+      content = data.candidates[0].content.parts[0].text;
     }
-    return null;
+
+    return content;
   } catch (error) {
-    console.error("Erro ao gerar áudio:", error);
-    return null;
+    console.error("Erro na chamada à API:", error);
+    throw error;
   }
 };
 
@@ -62,9 +96,7 @@ export const evaluateEssay = async (
   rubric?: string,
   textualGenre?: string
 ): Promise<EssayEvaluation> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = "gemini-2.5-flash";
-
+  const systemInstruction = "Você é um professor especialista em redação. Use JSON estrito.";
   const prompt = `
     Avalie a seguinte resposta dissertativa para a questão: "${questionText}".
     Gênero Textual esperado: "${textualGenre || 'Dissertativo-argumentativo'}"
@@ -88,59 +120,17 @@ export const evaluateEssay = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            score: { type: Type.INTEGER },
-            feedback: { type: Type.STRING },
-            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-            improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
-            styleFeedback: { type: Type.STRING },
-            structureFeedback: { type: Type.STRING },
-            competencies: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        id: { type: Type.INTEGER },
-                        name: { type: Type.STRING },
-                        score: { type: Type.INTEGER },
-                        feedback: { type: Type.STRING }
-                    },
-                    required: ["id", "name", "score", "feedback"]
-                }
-            },
-            modelEssay: { type: Type.STRING }
-          },
-          required: ["score", "feedback", "strengths", "improvements", "competencies", "modelEssay"],
-        },
-      },
-    });
-
-    if (response.text) {
-      const evaluation = JSON.parse(response.text) as EssayEvaluation;
-      // Normalize score to 0-100 for internal consistency if needed, or keep 0-1000 for display
-      // Let's keep 0-1000 for ENEM style if it's an essay, but the app expects 0-100 for progress bars.
-      // We'll map 0-1000 to 0-100 internally for the progress bar, but display the raw score.
-      // Actually, let's just return it as is and handle display in UI.
-      // Wait, the interface says score: number. If I change it to 1000, I need to make sure other parts handle it.
-      // The progress bar in QuizResults uses percentage calculation based on correct count, not raw score.
-      // But for the specific essay result card, it shows score/100. I should probably normalize it to 0-100 there or here.
-      // Let's normalize here to 0-100 for compatibility, but keep the competencies scores as is (0-200).
-      // Or better: update the UI to handle 0-1000 for essays.
-      // For now, I'll normalize the main score to 0-100 to avoid breaking the "passed" logic (>= 60).
-      // 600/1000 = 60/100.
+    const content = await callOpenRouter(prompt, systemInstruction);
+    // Extract JSON from content (OpenRouter might return markdown)
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const evaluation = JSON.parse(jsonMatch[0]) as EssayEvaluation;
       if (evaluation.score > 100) {
           evaluation.score = Math.round(evaluation.score / 10);
       }
       return evaluation;
     }
-    throw new Error("Resposta vazia da IA na avaliação.");
+    throw new Error("Não foi possível extrair JSON da resposta.");
   } catch (error) {
     console.error("Erro ao avaliar redação:", error);
     throw error;
@@ -148,9 +138,7 @@ export const evaluateEssay = async (
 };
 
 export const generateEssayModel = async (topic: string, genre?: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = "gemini-2.5-flash";
-
+  const systemInstruction = "Você é um escritor especialista.";
   const prompt = `
     Escreva uma redação modelo nota 1000 sobre o tema: "${topic}".
     Gênero Textual: "${genre || 'Dissertativo-argumentativo'}".
@@ -160,15 +148,7 @@ export const generateEssayModel = async (topic: string, genre?: string): Promise
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-    });
-
-    if (response.text) {
-      return response.text;
-    }
-    throw new Error("Resposta vazia da IA ao gerar modelo de redação.");
+    return await callOpenRouter(prompt, systemInstruction);
   } catch (error) {
     console.error("Erro ao gerar modelo de redação:", error);
     throw error;
@@ -176,9 +156,7 @@ export const generateEssayModel = async (topic: string, genre?: string): Promise
 };
 
 export const generateEssayTopic = async (genre?: string): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const model = "gemini-2.5-flash";
-  
+    const systemInstruction = "Você é um gerador de temas de redação.";
     const prompt = `
       Gere um tema de redação atual e relevante para o gênero textual: "${genre || 'Dissertativo-argumentativo'}".
       Retorne APENAS o título do tema, sem aspas ou explicações.
@@ -186,15 +164,8 @@ export const generateEssayTopic = async (genre?: string): Promise<string> => {
     `;
   
     try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-      });
-  
-      if (response.text) {
-        return response.text.trim();
-      }
-      throw new Error("Resposta vazia da IA ao gerar tema.");
+      const content = await callOpenRouter(prompt, systemInstruction);
+      return content.trim().replace(/^"|"$/g, '');
     } catch (error) {
       console.error("Erro ao gerar tema de redação:", error);
       throw error;
@@ -204,10 +175,6 @@ export const generateEssayTopic = async (genre?: string): Promise<string> => {
 export const generateQuiz = async (
   config: QuizConfig
 ): Promise<QuizData> => {
-  // Inicializa o cliente dentro da função para garantir que process.env.GEMINI_API_KEY esteja disponível
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = "gemini-2.5-flash";
-
   let difficultyPrompt = `Nível de Dificuldade: ${config.difficulty}.`;
   
   if (config.gameMode === 'arcade' && config.arcadeMap) {
@@ -289,11 +256,8 @@ export const generateQuiz = async (
           - Exemplo: Qual destes animais é um mamífero? (Opções com imagens de animais).
         - TRUE_FALSE: Pergunta com opções "Verdadeiro" e "Falso".
         - MATCHING: 3 a 4 pares de conceitos para relacionar.
-          IMPORTANTE: Utilize imagens para tornar o quiz mais visual.
-          - Você pode definir 'leftIsImage: true' ou 'rightIsImage: true' para gerar imagens.
-          - Exemplo: Ligar uma imagem de um animal (leftIsImage: true) ao seu habitat (texto).
           - Exemplo: Ligar um termo (texto) à sua definição (texto).
-          - Misture pares de texto-texto e imagem-texto.
+          - Apenas pares de texto-texto são permitidos. Não utilize imagens para este tipo de pergunta.
         - FILL_IN_THE_BLANK: Uma frase com uma lacuna (___) e a resposta correta (única palavra ou termo curto).
         - ESSAY: Pergunta dissertativa que exige argumentação. Inclua 'essayRubric'.
       `;
@@ -308,6 +272,7 @@ export const generateQuiz = async (
       `;
   }
 
+  const systemInstruction = "Você é um professor especialista criando quizzes para estudantes. Use JSON estrito.";
   const prompt = `
     Gere um quiz educacional e desafiador sobre o(s) tópico(s): "${config.topic}".
     Se houver múltiplos tópicos separados por vírgula, misture perguntas sobre todos eles de forma equilibrada.
@@ -329,84 +294,53 @@ export const generateQuiz = async (
     - Utilize 'questionImage: true' para gerar imagens ilustrativas para o enunciado das perguntas sempre que possível, especialmente para perguntas que descrevem cenários, objetos ou animais.
   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        systemInstruction: "Você é um professor especialista criando quizzes para estudantes. Use JSON estrito.",
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
+  const responseSchema = {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      questions: {
+        type: "array",
+        items: {
+          type: "object",
           properties: {
-            title: { type: Type.STRING, description: "Um título criativo para o quiz" },
-            storyNarrative: { type: Type.STRING, description: "Narrativa introdutória para o modo história (opcional)" },
-            questions: {
-              type: Type.ARRAY,
+            id: { type: "integer" },
+            type: { type: "string", enum: ["MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING", "FILL_IN_THE_BLANK", "ESSAY"] },
+            text: { type: "string" },
+            questionImage: { type: "boolean" },
+            options: { type: "array", items: { type: "string" } },
+            optionImages: { type: "array", items: { type: "boolean" } },
+            correctAnswerIndex: { type: "integer" },
+            explanation: { type: "string" },
+            essayRubric: { type: "string" },
+            pairs: {
+              type: "array",
               items: {
-                type: Type.OBJECT,
+                type: "object",
                 properties: {
-                  id: { type: Type.INTEGER },
-                  type: { 
-                    type: Type.STRING, 
-                    enum: ["MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING", "FILL_IN_THE_BLANK", "ESSAY"],
-                    description: "O tipo da pergunta"
-                  },
-                  text: { type: Type.STRING, description: "O enunciado da pergunta. Para FILL_IN_THE_BLANK, use '___' para indicar a lacuna." },
-                  questionImage: { type: Type.BOOLEAN, description: "Defina como true se a pergunta deve ter uma imagem gerada a partir do enunciado." },
-                  options: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING },
-                    description: "Lista de opções (para MC e TF). Para TF, use ['Verdadeiro', 'Falso']. Para FILL_IN_THE_BLANK, inclua APENAS a resposta correta como único item. Deixe vazio para MATCHING e ESSAY.",
-                  },
-                  optionImages: {
-                      type: Type.ARRAY,
-                      items: { type: Type.BOOLEAN },
-                      description: "Array de 4 booleanos. Defina como true se a opção correspondente deve ser uma imagem gerada a partir do texto da opção (apenas para MULTIPLE_CHOICE)."
-                  },
-                  correctAnswerIndex: {
-                    type: Type.INTEGER,
-                    description: "Índice da resposta correta (para MC e TF). Deixe null/0 para MATCHING, FILL_IN_THE_BLANK e ESSAY.",
-                  },
-                  pairs: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            left: { type: Type.STRING, description: "Texto ou prompt da imagem para o lado esquerdo." },
-                            right: { type: Type.STRING, description: "Texto ou prompt da imagem para o lado direito." },
-                            leftIsImage: { type: Type.BOOLEAN, description: "Defina como true se o lado esquerdo deve ser uma imagem gerada a partir do texto em 'left'." },
-                            rightIsImage: { type: Type.BOOLEAN, description: "Defina como true se o lado direito deve ser uma imagem gerada a partir do texto em 'right'." }
-                        },
-                        required: ["left", "right"]
-                    },
-                    description: "Pares para relacionar (apenas para MATCHING). Max 4 pares."
-                  },
-                  explanation: {
-                    type: Type.STRING,
-                    description: "Uma breve explicação de por que a resposta está correta. Para FILL_IN_THE_BLANK, a resposta correta deve estar claramente indicada aqui. Para ESSAY, forneça pontos-chave que deveriam ser abordados.",
-                  },
-                  essayRubric: {
-                      type: Type.STRING,
-                      description: "Critérios de avaliação para a resposta dissertativa (apenas para ESSAY)."
-                  },
-                  textualGenre: {
-                      type: Type.STRING,
-                      description: "O gênero textual esperado para a redação (apenas para ESSAY)."
-                  }
-                },
-                required: ["id", "type", "text", "explanation"],
-              },
-            },
+                  left: { type: "string" },
+                  right: { type: "string" }
+                }
+              }
+            }
           },
-          required: ["title", "questions"],
-        },
+          required: ["id", "type", "text", "explanation"]
+        }
       },
-    });
+      storyNarrative: { type: "string" }
+    },
+    required: ["title", "questions", ...(config.isStoryMode ? ["storyNarrative"] : [])]
+  };
 
-    if (response.text) {
-      const data = JSON.parse(response.text);
+  try {
+    const content = await callOpenRouter(prompt, systemInstruction, responseSchema);
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const data = JSON.parse(jsonMatch[0]);
       
+      if (!data.questions || !Array.isArray(data.questions)) {
+          throw new Error("O quiz gerado não contém perguntas válidas.");
+      }
+
       // Post-process to generate images for questions
       await Promise.all(data.questions.map(async (q: any) => {
           // Question Image
@@ -418,24 +352,7 @@ export const generateQuiz = async (
               }
           }
 
-          if (q.type === 'MATCHING' && q.pairs) {
-              await Promise.all(q.pairs.map(async (pair: any) => {
-                  if (pair.leftIsImage) {
-                      try {
-                          pair.leftImage = await generateImage(pair.left, "512px");
-                      } catch (e) {
-                          console.error("Failed to generate left image", e);
-                      }
-                  }
-                  if (pair.rightIsImage) {
-                      try {
-                          pair.rightImage = await generateImage(pair.right, "512px");
-                      } catch (e) {
-                          console.error("Failed to generate right image", e);
-                      }
-                  }
-              }));
-          } else if (q.type === 'MULTIPLE_CHOICE' && q.optionImages) {
+          if (q.type === 'MULTIPLE_CHOICE' && q.optionImages) {
               q.optionImages = await Promise.all(q.optionImages.map(async (shouldGen: boolean, idx: number) => {
                   if (shouldGen && q.options[idx]) {
                       try {
@@ -460,10 +377,10 @@ export const generateQuiz = async (
         isMultiplayer: config.isMultiplayer,
         isStoryMode: config.isStoryMode,
         arcadeMap: config.arcadeMap,
+        playerNames: config.playerNames,
       };
     }
-    
-    throw new Error("Resposta vazia da IA.");
+    throw new Error("Não foi possível extrair JSON da resposta.");
   } catch (error) {
     console.error("Erro ao gerar quiz:", error);
     throw error;

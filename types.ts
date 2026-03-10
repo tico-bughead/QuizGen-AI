@@ -44,6 +44,7 @@ export interface Question {
   type: QuestionType;
   text: string;
   image?: string; // Image for the question statement
+  video?: string; // Video URL for the question statement
   options?: string[]; // For MC and TF
   optionImages?: string[]; // Optional images for MC options, index-matched
   correctAnswerIndex?: number; // For MC and TF

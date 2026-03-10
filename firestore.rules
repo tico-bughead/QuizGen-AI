@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && resource != null && request.auth.uid == resource.data.userId;
+    }
+
+    function canDeleteDoc() {
+      return isAuthenticated() && (resource == null || request.auth.uid == resource.data.userId);
+    }
+
+    function uidUnchanged() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             data.email is string && data.email.size() > 0 && data.email.size() < 100 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidQuizResult(data) {
+      return data.keys().hasOnly(['userId', 'topic', 'score', 'totalQuestions', 'createdAt']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.topic is string && data.topic.size() > 0 && data.topic.size() < 100 &&
+             data.score is number && data.score >= 0 &&
+             data.totalQuestions is number && data.totalQuestions > 0 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasOnly(['userId', 'role', 'text', 'createdAt']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.role in ['user', 'model'] &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 5000 &&
+             data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.uid == userId;
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.uid == resource.data.uid && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(userId);
+    }
+
+    match /quizResults/{resultId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidQuizResult(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && isValidQuizResult(request.resource.data) && uidNotModified() && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if canDeleteDoc();
+    }
+
+    match /chatMessages/{messageId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidChatMessage(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && isValidChatMessage(request.resource.data) && uidNotModified() && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if canDeleteDoc();
+    }
+  }
+}

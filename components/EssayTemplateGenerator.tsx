@@ -291,7 +291,6 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
                             Modelo Gerado
                         </h3>
                         <Button 
-                            size="sm" 
                             variant="outline" 
                             onClick={handleDownloadModel}
                             icon={<Download className="w-3 h-3" />}

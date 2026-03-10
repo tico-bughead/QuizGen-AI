@@ -12,9 +12,10 @@ interface QuizResultsProps {
   onHome: () => void;
   score?: number | number[];
   essayEvaluations?: Record<number, EssayEvaluation>;
+  onNextLevel?: () => void;
 }
 
-export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry, onHome, score: resultScore, essayEvaluations }) => {
+export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry, onHome, score: resultScore, essayEvaluations, onNextLevel }) => {
   let correctCount = 0;
   quiz.questions.forEach(q => {
     if (q.type === 'MATCHING') {
@@ -213,7 +214,7 @@ export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry
               )}
 
               {/* Multiplayer Scores */}
-              {quiz.gameMode === 'multiplayer' && Array.isArray(resultScore) && (
+              {quiz.isMultiplayer && Array.isArray(resultScore) && (
                   <div className="mt-6 w-full max-w-md mx-auto bg-white/10 rounded-2xl border border-white/20 p-4">
                       <h3 className="text-white font-bold mb-3 flex items-center justify-center gap-2">
                           <Trophy className="w-5 h-5 text-yellow-400" />
@@ -346,7 +347,6 @@ export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry
                                                           {/* Export Buttons for Essay */}
                                                           <div className="flex gap-2 mt-4">
                                                               <Button 
-                                                                  size="sm" 
                                                                   variant="outline" 
                                                                   onClick={() => {
                                                                       const doc = new jsPDF();
@@ -376,7 +376,6 @@ export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry
                                                               
                                                               {essayEvaluations[q.id].modelEssay && (
                                                                   <Button 
-                                                                      size="sm" 
                                                                       variant="outline" 
                                                                       onClick={() => {
                                                                           const doc = new jsPDF();
@@ -463,9 +462,15 @@ export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry
           <Button variant="outline" onClick={handleExportPDF} icon={<Download className="w-4 h-4" />} className="bg-white text-slate-700 hover:bg-slate-100 border-transparent shadow-lg w-full sm:w-auto">
             Exportar PDF
           </Button>
-          <Button onClick={onRetry} icon={<RefreshCw className="w-4 h-4" />} className="shadow-lg w-full sm:w-auto">
-            Refazer Quiz
-          </Button>
+          {onNextLevel ? (
+              <Button onClick={onNextLevel} icon={<SkipForward className="w-4 h-4" />} className="shadow-lg w-full sm:w-auto bg-amber-500 hover:bg-amber-600">
+                Próximo Nível
+              </Button>
+          ) : (
+              <Button onClick={onRetry} icon={<RefreshCw className="w-4 h-4" />} className="shadow-lg w-full sm:w-auto">
+                Refazer Quiz
+              </Button>
+          )}
         </motion.div>
       </div>
     </motion.div>

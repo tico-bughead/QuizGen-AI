@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { QuizData, Question, Difficulty, QuizTheme, GameMode, QuestionType } from '../types';
 import { Button } from './Button';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Save, ArrowLeft, CheckCircle2, AlertCircle, ArrowRight, Image as ImageIcon, Sparkles, Loader2 } from 'lucide-react';
-import { generateImage } from '../services/geminiService';
+import { Plus, Trash2, Save, ArrowLeft, CheckCircle2, ArrowRight, Image as ImageIcon, Video, Search } from 'lucide-react';
+import { ImageSearchModal } from './ImageSearchModal';
 
 interface QuizCreatorProps {
   onSave: (quizData: QuizData) => void;
@@ -27,7 +27,36 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
     }
   ]);
 
-  const [generatingImages, setGeneratingImages] = useState<Record<string, boolean>>({});
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchTarget, setSearchTarget] = useState<{
+    type: 'question' | 'option' | 'pair';
+    qIndex: number;
+    oIndex?: number;
+    pIndex?: number;
+    side?: 'left' | 'right';
+  } | null>(null);
+
+  const handleImageSelect = (imageUrl: string) => {
+    if (!searchTarget) return;
+
+    const newQuestions = [...questions];
+    const qIndex = searchTarget.qIndex;
+
+    if (searchTarget.type === 'question') {
+      newQuestions[qIndex].image = imageUrl;
+    } else if (searchTarget.type === 'option' && searchTarget.oIndex !== undefined) {
+      const newOptionImages = [...(newQuestions[qIndex].optionImages || ['', '', '', ''])];
+      newOptionImages[searchTarget.oIndex] = imageUrl;
+      newQuestions[qIndex].optionImages = newOptionImages;
+    } else if (searchTarget.type === 'pair' && searchTarget.pIndex !== undefined && searchTarget.side) {
+      const newPairs = [...(newQuestions[qIndex].pairs || [])];
+      const field = searchTarget.side === 'left' ? 'leftImage' : 'rightImage';
+      newPairs[searchTarget.pIndex] = { ...newPairs[searchTarget.pIndex], [field]: imageUrl };
+      newQuestions[qIndex].pairs = newPairs;
+    }
+
+    setQuestions(newQuestions);
+  };
 
   const handleImageUpload = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -73,43 +102,6 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
       setQuestions(newQuestions);
   };
 
-
-  const handleGenerateImageForPair = async (qIndex: number, pIndex: number, side: 'left' | 'right') => {
-    const question = questions[qIndex];
-    const pair = question.pairs?.[pIndex];
-    if (!pair) return;
-
-    const text = side === 'left' ? pair.left : pair.right;
-    if (!text.trim()) {
-        alert("Digite um texto para gerar a imagem.");
-        return;
-    }
-
-    const key = `${qIndex}-${pIndex}-${side}`;
-    setGeneratingImages(prev => ({ ...prev, [key]: true }));
-
-    try {
-        const imageUrl = await generateImage(text, "512px"); // Use smaller size for matching cards
-        if (imageUrl) {
-            const field = side === 'left' ? 'leftImage' : 'rightImage';
-            // Update pair
-            const newQuestions = [...questions];
-            const newPairs = [...(newQuestions[qIndex].pairs || [])];
-            newPairs[pIndex] = { ...newPairs[pIndex], [field]: imageUrl };
-            newQuestions[qIndex].pairs = newPairs;
-            setQuestions(newQuestions);
-        }
-    } catch (error) {
-        console.error("Error generating image:", error);
-        alert("Erro ao gerar imagem. Tente novamente.");
-    } finally {
-        setGeneratingImages(prev => {
-            const next = { ...prev };
-            delete next[key];
-            return next;
-        });
-    }
-  };
 
   const handleAddQuestion = () => {
     setQuestions([
@@ -279,7 +271,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
         </div>
         <Button 
           onClick={handleSave} 
-          className="bg-white text-indigo-600 hover:bg-indigo-50 border-transparent shadow-none"
+          className="bg-white text-black hover:bg-indigo-50 border-indigo-600 shadow-none"
           icon={<Save className="w-5 h-5" />}
         >
           Salvar e Jogar
@@ -400,48 +392,36 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                   className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium"
                                 />
                                 <div className="flex gap-2 items-center">
-                                    {q.image ? (
-                                        <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 group/img">
-                                            <img src={q.image} alt="Question" className="w-full h-full object-cover" />
-                                            <button 
-                                                onClick={() => handleQuestionChange(qIndex, 'image', undefined)}
-                                                className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity text-white"
-                                            >
-                                                <Trash2 className="w-5 h-5" />
-                                            </button>
+                                    {q.image || q.video ? (
+                                        <div className="flex gap-4">
+                                            {q.image && (
+                                                <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 group/img">
+                                                    <img src={q.image} alt="Question" className="w-full h-full object-cover" />
+                                                    <button 
+                                                        onClick={() => handleQuestionChange(qIndex, 'image', undefined)}
+                                                        className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity text-white"
+                                                    >
+                                                        <Trash2 className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {q.video && (
+                                                <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 group/video">
+                                                    <video src={q.video} className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                                        <Video className="w-8 h-8 text-white opacity-50" />
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => handleQuestionChange(qIndex, 'video', undefined)}
+                                                        className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/video:opacity-100 transition-opacity text-white"
+                                                    >
+                                                        <Trash2 className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="flex gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    const text = q.text;
-                                                    if (!text.trim()) {
-                                                        alert("Digite um texto para gerar a imagem.");
-                                                        return;
-                                                    }
-                                                    const key = `${qIndex}-text`;
-                                                    setGeneratingImages(prev => ({ ...prev, [key]: true }));
-                                                    generateImage(text, "512px").then(url => {
-                                                        if (url) {
-                                                            handleQuestionChange(qIndex, 'image', url);
-                                                        }
-                                                    }).catch(e => {
-                                                        console.error(e);
-                                                        alert("Erro ao gerar imagem.");
-                                                    }).finally(() => {
-                                                        setGeneratingImages(prev => {
-                                                            const next = { ...prev };
-                                                            delete next[key];
-                                                            return next;
-                                                        });
-                                                    });
-                                                }}
-                                                disabled={generatingImages[`${qIndex}-text`]}
-                                                className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-3 py-2 rounded-lg hover:bg-indigo-100 transition-colors font-medium"
-                                            >
-                                                {generatingImages[`${qIndex}-text`] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                                Gerar Imagem do Enunciado
-                                            </button>
                                             <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200 font-medium">
                                                 <ImageIcon className="w-4 h-4" />
                                                 Subir Imagem
@@ -453,6 +433,32 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                         if (e.target.files?.[0]) {
                                                             handleImageUpload(e.target.files[0]).then(url => {
                                                                 handleQuestionChange(qIndex, 'image', url);
+                                                            });
+                                                        }
+                                                    }}
+                                                />
+                                            </label>
+                                            <button
+                                                onClick={() => {
+                                                    setSearchTarget({ type: 'question', qIndex });
+                                                    setSearchModalOpen(true);
+                                                }}
+                                                className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200 font-medium"
+                                            >
+                                                <Search className="w-4 h-4" />
+                                                Pesquisar Imagem
+                                            </button>
+                                            <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200 font-medium">
+                                                <Video className="w-4 h-4" />
+                                                Subir Vídeo
+                                                <input 
+                                                    type="file" 
+                                                    className="hidden" 
+                                                    accept="video/*"
+                                                    onChange={(e) => {
+                                                        if (e.target.files?.[0]) {
+                                                            handleImageUpload(e.target.files[0]).then(url => {
+                                                                handleQuestionChange(qIndex, 'video', url);
                                                             });
                                                         }
                                                     }}
@@ -488,37 +494,13 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                               <button
                                                   onClick={() => {
-                                                      const text = opt;
-                                                      if (!text.trim()) {
-                                                          alert("Digite um texto para gerar a imagem.");
-                                                          return;
-                                                      }
-                                                      const key = `${qIndex}-${oIndex}-opt`;
-                                                      setGeneratingImages(prev => ({ ...prev, [key]: true }));
-                                                      generateImage(text, "512px").then(url => {
-                                                          if (url) {
-                                                              const newQuestions = [...questions];
-                                                              const newOptionImages = [...(newQuestions[qIndex].optionImages || ['', '', '', ''])];
-                                                              newOptionImages[oIndex] = url;
-                                                              newQuestions[qIndex].optionImages = newOptionImages;
-                                                              setQuestions(newQuestions);
-                                                          }
-                                                      }).catch(e => {
-                                                          console.error(e);
-                                                          alert("Erro ao gerar imagem.");
-                                                      }).finally(() => {
-                                                          setGeneratingImages(prev => {
-                                                              const next = { ...prev };
-                                                              delete next[key];
-                                                              return next;
-                                                          });
-                                                      });
+                                                      setSearchTarget({ type: 'option', qIndex, oIndex });
+                                                      setSearchModalOpen(true);
                                                   }}
-                                                  disabled={generatingImages[`${qIndex}-${oIndex}-opt`]}
-                                                  className="p-1 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
-                                                  title="Gerar Imagem com IA"
+                                                  className="cursor-pointer text-slate-400 hover:text-indigo-600 transition-colors p-1"
+                                                  title="Pesquisar Imagem"
                                               >
-                                                  {generatingImages[`${qIndex}-${oIndex}-opt`] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                                  <Search className="w-4 h-4" />
                                               </button>
                                               <label className="cursor-pointer text-slate-400 hover:text-indigo-600 transition-colors p-1" title="Subir Imagem">
                                                   <ImageIcon className="w-4 h-4" />
@@ -601,7 +583,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                     onChange={(e) => handlePairChange(qIndex, pIndex, 'left', e.target.value)}
                                                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                                 />
-                                                <div className="flex gap-2 items-center">
+                                                 <div className="flex gap-2 items-center">
                                                     {pair.leftImage ? (
                                                         <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group/img">
                                                             <img src={pair.leftImage} alt="Left" className="w-full h-full object-cover" />
@@ -621,12 +603,14 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                     ) : (
                                                         <div className="flex gap-1">
                                                             <button
-                                                                onClick={() => handleGenerateImageForPair(qIndex, pIndex, 'left')}
-                                                                disabled={generatingImages[`${qIndex}-${pIndex}-left`]}
-                                                                className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
+                                                                onClick={() => {
+                                                                    setSearchTarget({ type: 'pair', qIndex, pIndex, side: 'left' });
+                                                                    setSearchModalOpen(true);
+                                                                }}
+                                                                className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
                                                             >
-                                                                {generatingImages[`${qIndex}-${pIndex}-left`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                                                Gerar
+                                                                <Search className="w-3 h-3" />
+                                                                Pesquisar
                                                             </button>
                                                             <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200">
                                                                 <ImageIcon className="w-3 h-3" />
@@ -676,12 +660,14 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                     ) : (
                                                         <div className="flex gap-1">
                                                             <button
-                                                                onClick={() => handleGenerateImageForPair(qIndex, pIndex, 'right')}
-                                                                disabled={generatingImages[`${qIndex}-${pIndex}-right`]}
-                                                                className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
+                                                                onClick={() => {
+                                                                    setSearchTarget({ type: 'pair', qIndex, pIndex, side: 'right' });
+                                                                    setSearchModalOpen(true);
+                                                                }}
+                                                                className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
                                                             >
-                                                                {generatingImages[`${qIndex}-${pIndex}-right`] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                                                Gerar
+                                                                <Search className="w-3 h-3" />
+                                                                Pesquisar
                                                             </button>
                                                             <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200">
                                                                 <ImageIcon className="w-3 h-3" />
@@ -758,6 +744,12 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
           </div>
         </div>
       </div>
+
+      <ImageSearchModal 
+        isOpen={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        onSelect={handleImageSelect}
+      />
     </motion.div>
   );
 };
