@@ -11,9 +11,9 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY)
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY?.trim() || env.OPENROUTER_API_KEY?.trim()),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY?.trim()),
+        'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY?.trim())
       },
       resolve: {
         alias: {

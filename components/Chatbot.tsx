@@ -121,10 +121,11 @@ export const Chatbot: React.FC = () => {
         collapsedMessages.push({ role: 'user', content: userText });
       }
 
-      const API_KEY = process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
-      const IS_OPENROUTER = !!process.env.OPENROUTER_API_KEY;
+      const API_KEY = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY;
+      console.log("API_KEY:", API_KEY ? "defined" : "undefined", "GEMINI:", process.env.GEMINI_API_KEY ? "defined" : "undefined", "OPENROUTER:", process.env.OPENROUTER_API_KEY ? "defined" : "undefined");
+      const IS_OPENROUTER = !!process.env.OPENROUTER_API_KEY || (API_KEY?.startsWith('sk-or-') ?? false);
       const BASE_URL = IS_OPENROUTER ? "https://openrouter.ai/api/v1" : "https://generativelanguage.googleapis.com/v1beta";
-      const model = IS_OPENROUTER ? "google/gemma-2-9b-it:free" : "gemini-3-flash-preview";
+      const model = IS_OPENROUTER ? "openrouter/free" : "gemini-3-flash-preview";
       const url = IS_OPENROUTER ? `${BASE_URL}/chat/completions` : `${BASE_URL}/models/${model}:generateContent?key=${API_KEY}`;
 
       let modelText = "";

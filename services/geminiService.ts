@@ -1,7 +1,7 @@
 import { QuizData, Difficulty, QuizConfig, EssayEvaluation } from "../types";
 
-const API_KEY = process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
-const IS_OPENROUTER = !!process.env.OPENROUTER_API_KEY;
+const API_KEY = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY;
+const IS_OPENROUTER = !!process.env.OPENROUTER_API_KEY || (API_KEY?.startsWith('sk-or-') ?? false);
 const BASE_URL = IS_OPENROUTER ? "https://openrouter.ai/api/v1" : "https://generativelanguage.googleapis.com/v1beta";
 
 export const generateImage = async (prompt: string, size: "512px" | "1K" | "2K" | "4K" = "1K"): Promise<string | null> => {
@@ -20,7 +20,7 @@ export const generateSpeech = async (text: string): Promise<string | null> => {
 const callOpenRouter = async (prompt: string, systemInstruction: string, responseSchema?: any) => {
   if (!API_KEY) throw new Error("API Key não configurada.");
 
-  const model = IS_OPENROUTER ? "google/gemma-2-9b-it:free" : "gemini-3-flash-preview";
+  const model = IS_OPENROUTER ? "openrouter/free" : "gemini-3-flash-preview";
   const url = IS_OPENROUTER ? `${BASE_URL}/chat/completions` : `${BASE_URL}/models/${model}:generateContent?key=${API_KEY}`;
 
   const messages = [
