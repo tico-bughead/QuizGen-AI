@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY?.trim()),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY?.trim()),
         'process.env.QUIZ_GEN_CHAT': JSON.stringify(env.QUIZ_GEN_CHAT?.trim()),
         'process.env.QUIZ_GEN_IMAGES': JSON.stringify(env.QUIZ_GEN_IMAGES?.trim())
       },

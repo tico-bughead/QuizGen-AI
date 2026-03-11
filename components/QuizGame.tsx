@@ -893,7 +893,10 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   const isCorrect = question.type === 'MATCHING' 
       ? answers[question.id] === 1 
       : question.type === 'FILL_IN_THE_BLANK'
-          ? (typeof answers[question.id] === 'string' && (question.options?.[0]?.toLowerCase() === answers[question.id].trim().toLowerCase()))
+          ? (typeof answers[question.id] === 'string' && (
+              question.options?.[0]?.toLowerCase() === answers[question.id].trim().toLowerCase() ||
+              (question.options?.[0] === "" && question.explanation.toLowerCase().includes(answers[question.id].trim().toLowerCase()))
+            ))
           : question.type === 'ESSAY'
               ? (allEssayEvaluations[question.id] && allEssayEvaluations[question.id].score >= 60)
               : selectedOption === question.correctAnswerIndex;

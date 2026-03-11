@@ -22,6 +22,15 @@ export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry
         if (answers[q.id] === 1) correctCount++;
     } else if (q.type === 'ESSAY') {
         if (essayEvaluations?.[q.id]?.score && essayEvaluations[q.id].score >= 60) correctCount++;
+    } else if (q.type === 'FILL_IN_THE_BLANK') {
+        const isSkipped = answers[q.id] === -1 || answers[q.id] === undefined || answers[q.id] === '';
+        if (!isSkipped) {
+            const normalizedUserAnswer = (answers[q.id] as string || "").trim().toLowerCase();
+            const correct = q.options?.[0]?.toLowerCase() || "";
+            if (normalizedUserAnswer === correct || (correct === "" && q.explanation.toLowerCase().includes(normalizedUserAnswer))) {
+                correctCount++;
+            }
+        }
     } else {
         if (answers[q.id] === q.correctAnswerIndex) {
             correctCount++;
@@ -103,7 +112,7 @@ export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry
              y += 7;
           });
       } else if (q.type === 'FILL_IN_THE_BLANK') {
-          const answerText = `   Resposta: ${q.explanation}`; // Usually explanation contains the answer context
+          const answerText = `   Resposta: ${q.options?.[0] || q.explanation}`;
            if (y > 280) {
              doc.addPage();
              y = 20;
@@ -259,14 +268,26 @@ export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry
                   {quiz.questions.map((q, idx) => {
                       const userAnswerIdx = answers[q.id];
                       let isCorrect = false;
+                      let isSkipped = false;
                       if (q.type === 'MATCHING') {
                           isCorrect = userAnswerIdx === 1;
+                          isSkipped = userAnswerIdx === -1 || userAnswerIdx === undefined;
                       } else if (q.type === 'ESSAY') {
                           isCorrect = (essayEvaluations?.[q.id]?.score || 0) >= 60;
+                          isSkipped = userAnswerIdx === -1 || userAnswerIdx === undefined || userAnswerIdx === '';
+                      } else if (q.type === 'FILL_IN_THE_BLANK') {
+                          isSkipped = userAnswerIdx === -1 || userAnswerIdx === undefined || userAnswerIdx === '';
+                          if (isSkipped) {
+                              isCorrect = false;
+                          } else {
+                              const normalizedUserAnswer = (userAnswerIdx as string || "").trim().toLowerCase();
+                              const correct = q.options?.[0]?.toLowerCase() || "";
+                              isCorrect = normalizedUserAnswer === correct || (correct === "" && q.explanation.toLowerCase().includes(normalizedUserAnswer));
+                          }
                       } else {
                           isCorrect = userAnswerIdx === q.correctAnswerIndex;
+                          isSkipped = userAnswerIdx === -1 || userAnswerIdx === undefined;
                       }
-                      const isSkipped = userAnswerIdx === -1 || userAnswerIdx === undefined;
                       
                           return (
                               <div key={q.id} className={`${styles.itemBg} p-4 sm:p-6 rounded-[2rem] shadow-sm border`}>
@@ -403,6 +424,19 @@ export const QuizResults: React.FC<QuizResultsProps> = ({ quiz, answers, onRetry
                                                                   </Button>
                                                               )}
                                                           </div>
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          ) : q.type === 'FILL_IN_THE_BLANK' ? (
+                                              <div className="space-y-3">
+                                                  <div className={`p-3 rounded-xl border ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                                      <span className={`text-xs font-bold uppercase mb-1 block ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>Sua Resposta:</span>
+                                                      <p className={`text-sm font-bold ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>{userAnswerIdx || "Sem resposta"}</p>
+                                                  </div>
+                                                  {!isCorrect && (
+                                                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                                          <span className="text-xs font-bold uppercase text-slate-500 mb-1 block">Resposta Esperada:</span>
+                                                          <p className="text-sm font-bold text-slate-700">{q.options?.[0] || "Veja a explicação"}</p>
                                                       </div>
                                                   )}
                                               </div>

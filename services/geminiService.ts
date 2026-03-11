@@ -2,14 +2,10 @@ import { QuizData, Difficulty, QuizConfig, EssayEvaluation } from "../types";
 
 import { GoogleGenAI } from "@google/genai";
 
-const API_KEY = process.env.OPENROUTER_API_KEY;
-const IS_OPENROUTER = API_KEY?.startsWith('sk-or-') ?? false;
-const BASE_URL = IS_OPENROUTER ? "https://openrouter.ai/api/v1" : "https://generativelanguage.googleapis.com/v1beta";
-
 export const generateImage = async (prompt: string, size: "512px" | "1K" | "2K" | "4K" = "1K"): Promise<string | null> => {
-  const IMAGE_API_KEY = process.env.QUIZ_GEN_IMAGES;
+  const IMAGE_API_KEY = process.env.QUIZ_GEN_IMAGES || process.env.GEMINI_API_KEY;
   if (!IMAGE_API_KEY) {
-    console.warn("QUIZ_GEN_IMAGES não configurada. Geração de imagens desativada.");
+    console.warn("QUIZ_GEN_IMAGES ou GEMINI_API_KEY não configurada. Geração de imagens desativada.");
     return null;
   }
   
@@ -47,75 +43,31 @@ export const generateSpeech = async (text: string): Promise<string | null> => {
   return null;
 };
 
-const callOpenRouter = async (prompt: string, systemInstruction: string, responseSchema?: any) => {
-  if (!API_KEY) throw new Error("API Key não configurada.");
+const callGemini = async (prompt: string, systemInstruction: string, responseSchema?: any) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
-  const model = IS_OPENROUTER ? "openrouter/free" : "gemini-3-flash-preview";
-  const url = IS_OPENROUTER ? `${BASE_URL}/chat/completions` : `${BASE_URL}/models/${model}:generateContent?key=${API_KEY}`;
+  const ai = new GoogleGenAI({ apiKey });
 
-  const messages = [
-    { role: "system", content: systemInstruction },
-    { role: "user", content: prompt }
-  ];
-
+  let finalPrompt = prompt;
   if (responseSchema) {
-    messages[1].content += `\n\nRetorne a resposta estritamente no formato JSON seguindo este esquema: ${JSON.stringify(responseSchema)}`;
+    finalPrompt += `\n\nRetorne a resposta estritamente no formato JSON seguindo este esquema: ${JSON.stringify(responseSchema)}`;
   }
 
   try {
-    let content = "";
-
-    if (IS_OPENROUTER) {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "Quiz AI Master"
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: messages,
-          response_format: responseSchema ? { type: "json_object" } : undefined,
-          temperature: 0.7
-        })
-      });
-
-      const text = await response.text();
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = JSON.parse(text);
-        } catch (e) {
-          errorData = { error: { message: text } };
-        }
-        throw new Error(errorData.error?.message || `Erro na chamada ao OpenRouter: ${response.status}`);
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: finalPrompt,
+      config: {
+        systemInstruction: systemInstruction,
+        responseMimeType: responseSchema ? "application/json" : "text/plain",
+        temperature: 0.7,
       }
+    });
 
-      const data = JSON.parse(text);
-      content = data.choices[0].message.content;
-    } else {
-      // Direct Gemini API
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${systemInstruction}\n\n${prompt}${responseSchema ? `\n\nResponda em JSON seguindo este esquema: ${JSON.stringify(responseSchema)}` : ''}` }] }],
-          generationConfig: responseSchema ? { responseMimeType: "application/json" } : undefined
-        })
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error?.message || `Erro na chamada ao Gemini: ${response.status}`);
-      }
-      content = data.candidates[0].content.parts[0].text;
-    }
-
-    return content;
+    return response.text || "";
   } catch (error) {
-    console.error("Erro na chamada à API:", error);
+    console.error("Erro na chamada à API do Gemini:", error);
     throw error;
   }
 };
@@ -150,7 +102,7 @@ export const evaluateEssay = async (
   `;
 
   try {
-    const content = await callOpenRouter(prompt, systemInstruction);
+    const content = await callGemini(prompt, systemInstruction);
     // Extract JSON from content (OpenRouter might return markdown)
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -178,7 +130,7 @@ export const generateEssayModel = async (topic: string, genre?: string): Promise
   `;
 
   try {
-    return await callOpenRouter(prompt, systemInstruction);
+    return await callGemini(prompt, systemInstruction);
   } catch (error) {
     console.error("Erro ao gerar modelo de redação:", error);
     throw error;
@@ -194,7 +146,7 @@ export const generateEssayTopic = async (genre?: string): Promise<string> => {
     `;
   
     try {
-      const content = await callOpenRouter(prompt, systemInstruction);
+      const content = await callGemini(prompt, systemInstruction);
       return content.trim().replace(/^"|"$/g, '');
     } catch (error) {
       console.error("Erro ao gerar tema de redação:", error);
@@ -364,7 +316,7 @@ export const generateQuiz = async (
   };
 
   try {
-    const content = await callOpenRouter(prompt, systemInstruction, responseSchema);
+    const content = await callGemini(prompt, systemInstruction, responseSchema);
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const data = JSON.parse(jsonMatch[0]);

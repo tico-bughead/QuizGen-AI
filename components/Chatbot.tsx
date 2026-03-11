@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from '../firebase';
 import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import Markdown from 'react-markdown';
+import { GoogleGenAI } from '@google/genai';
 
 interface Message {
   id: string;
@@ -121,71 +122,28 @@ export const Chatbot: React.FC = () => {
         collapsedMessages.push({ role: 'user', content: userText });
       }
 
-      const API_KEY = process.env.QUIZ_GEN_CHAT;
-      console.log("API_KEY:", API_KEY ? "defined" : "undefined");
-      const IS_OPENROUTER = API_KEY?.startsWith('sk-or-') ?? false;
-      const BASE_URL = IS_OPENROUTER ? "https://openrouter.ai/api/v1" : "https://generativelanguage.googleapis.com/v1beta";
-      const model = IS_OPENROUTER ? "openrouter/free" : "gemini-3-flash-preview";
-      const url = IS_OPENROUTER ? `${BASE_URL}/chat/completions` : `${BASE_URL}/models/${model}:generateContent?key=${API_KEY}`;
+      const API_KEY = process.env.QUIZ_GEN_CHAT || process.env.GEMINI_API_KEY;
+      if (!API_KEY) throw new Error("API Key não configurada.");
+
+      const ai = new GoogleGenAI({ apiKey: API_KEY });
 
       let modelText = "";
 
-      if (IS_OPENROUTER) {
-        const openRouterMessages = [
-          {
-            role: 'system',
-            content: "Você é um assistente educacional amigável e inteligente do QuizGen AI. Seu objetivo é ajudar os usuários a aprenderem novos conhecimentos, responderem dúvidas sobre tópicos variados e darem dicas de estudo. Seja claro, conciso e encorajador."
-          },
-          ...collapsedMessages
-        ];
+      const geminiContents = collapsedMessages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
 
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${API_KEY}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': window.location.origin,
-            'X-Title': 'QuizGen AI'
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: openRouterMessages
-          })
-        });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("OpenRouter API error details:", errorText);
-          throw new Error(`OpenRouter API error: ${res.status} - ${errorText}`);
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: geminiContents,
+        config: {
+          systemInstruction: "Você é um assistente educacional amigável e inteligente do QuizGen AI. Seu objetivo é ajudar os usuários a aprenderem novos conhecimentos, responderem dúvidas sobre tópicos variados e darem dicas de estudo. Seja claro, conciso e encorajador.",
+          temperature: 0.7,
         }
+      });
 
-        const data = await res.json();
-        modelText = data.choices[0]?.message?.content || "Desculpe, não consegui gerar uma resposta.";
-      } else {
-        // Gemini API
-        const geminiContents = collapsedMessages.map(m => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }]
-        }));
-
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: "Você é um assistente educacional amigável e inteligente do QuizGen AI. Seu objetivo é ajudar os usuários a aprenderem novos conhecimentos, responderem dúvidas sobre tópicos variados e darem dicas de estudo. Seja claro, conciso e encorajador." }] },
-            contents: geminiContents
-          })
-        });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("Gemini API error details:", errorText);
-          throw new Error(`Gemini API error: ${res.status} - ${errorText}`);
-        }
-
-        const data = await res.json();
-        modelText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Desculpe, não consegui gerar uma resposta.";
-      }
+      modelText = response.text || "Desculpe, não consegui gerar uma resposta.";
 
       // Save model message
       await addDoc(collection(db, 'chatMessages'), {
