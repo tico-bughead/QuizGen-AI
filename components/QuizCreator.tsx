@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { QuizData, Question, Difficulty, QuizTheme, GameMode, QuestionType } from '../types';
 import { Button } from './Button';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Save, ArrowLeft, CheckCircle2, ArrowRight, Image as ImageIcon, Video, Search } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, CheckCircle2, ArrowRight, Image as ImageIcon, Video, Search, Sparkles, Loader2, X } from 'lucide-react';
 import { ImageSearchModal } from './ImageSearchModal';
+import { generateImage } from '../services/geminiService';
 
 interface QuizCreatorProps {
   onSave: (quizData: QuizData) => void;
@@ -15,6 +16,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
   const [topic, setTopic] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.Medium);
   const [theme, setTheme] = useState<QuizTheme>('light');
+  const [isGeneratingImage, setIsGeneratingImage] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([
     {
       id: 1,
@@ -35,6 +37,15 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
     pIndex?: number;
     side?: 'left' | 'right';
   } | null>(null);
+
+  const [generateModalOpen, setGenerateModalOpen] = useState(false);
+  const [generateTarget, setGenerateTarget] = useState<{
+    type: 'question' | 'option' | 'pair';
+    qIndex: number;
+    oIndex?: number;
+    side?: 'left' | 'right';
+  } | null>(null);
+  const [generatePrompt, setGeneratePrompt] = useState('');
 
   const handleImageSelect = (imageUrl: string) => {
     if (!searchTarget) return;
@@ -102,6 +113,62 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
       setQuestions(newQuestions);
   };
 
+  const openGenerateModal = (qIndex: number, type: 'question' | 'option' | 'pair', oIndex?: number, side?: 'left' | 'right') => {
+      const q = questions[qIndex];
+      let initialPrompt = '';
+      
+      if (type === 'question') {
+          initialPrompt = q.text || topic || 'Uma imagem educacional';
+      } else if (type === 'option' && oIndex !== undefined) {
+          initialPrompt = q.options?.[oIndex] || q.text || 'Uma opção educacional';
+      } else if (type === 'pair' && oIndex !== undefined && side) {
+          initialPrompt = side === 'left' ? q.pairs?.[oIndex]?.left : q.pairs?.[oIndex]?.right;
+          initialPrompt = initialPrompt || 'Um conceito educacional';
+      }
+
+      setGenerateTarget({ type, qIndex, oIndex, side });
+      setGeneratePrompt(initialPrompt);
+      setGenerateModalOpen(true);
+  };
+
+  const submitGenerateImage = async () => {
+      if (!generateTarget || !generatePrompt.trim()) return;
+      
+      const { qIndex, type, oIndex, side } = generateTarget;
+      const loadingKey = `${qIndex}-${type}-${oIndex}-${side}`;
+      
+      setIsGeneratingImage(loadingKey);
+      setGenerateModalOpen(false);
+      
+      try {
+          const imageUrl = await generateImage(generatePrompt, "512px");
+          if (imageUrl) {
+              const newQuestions = [...questions];
+              if (type === 'question') {
+                  newQuestions[qIndex].image = imageUrl;
+              } else if (type === 'option' && oIndex !== undefined) {
+                  const newOptionImages = [...(newQuestions[qIndex].optionImages || ['', '', '', ''])];
+                  newOptionImages[oIndex] = imageUrl;
+                  newQuestions[qIndex].optionImages = newOptionImages;
+              } else if (type === 'pair' && oIndex !== undefined && side) {
+                  const newPairs = [...(newQuestions[qIndex].pairs || [])];
+                  const field = side === 'left' ? 'leftImage' : 'rightImage';
+                  newPairs[oIndex] = { ...newPairs[oIndex], [field]: imageUrl };
+                  newQuestions[qIndex].pairs = newPairs;
+              }
+              setQuestions(newQuestions);
+          } else {
+              alert("Não foi possível gerar a imagem. Verifique se a chave QUIZ_GEN_IMAGES está configurada.");
+          }
+      } catch (error) {
+          console.error("Erro ao gerar imagem:", error);
+          alert("Erro ao gerar imagem. Verifique o console para mais detalhes.");
+      } finally {
+          setIsGeneratingImage(null);
+          setGenerateTarget(null);
+          setGeneratePrompt('');
+      }
+  };
 
   const handleAddQuestion = () => {
     setQuestions([
@@ -448,6 +515,18 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                 <Search className="w-4 h-4" />
                                                 Pesquisar Imagem
                                             </button>
+                                            <button
+                                                onClick={() => openGenerateModal(qIndex, 'question')}
+                                                disabled={isGeneratingImage === `${qIndex}-question-undefined-undefined`}
+                                                className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-3 py-2 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer border border-indigo-200 font-medium disabled:opacity-50"
+                                            >
+                                                {isGeneratingImage === `${qIndex}-question-undefined-undefined` ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <Sparkles className="w-4 h-4" />
+                                                )}
+                                                Gerar com IA
+                                            </button>
                                             <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200 font-medium">
                                                 <Video className="w-4 h-4" />
                                                 Subir Vídeo
@@ -501,6 +580,18 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                   title="Pesquisar Imagem"
                                               >
                                                   <Search className="w-4 h-4" />
+                                              </button>
+                                              <button
+                                                  onClick={() => openGenerateModal(qIndex, 'option', oIndex)}
+                                                  disabled={isGeneratingImage === `${qIndex}-option-${oIndex}-undefined`}
+                                                  className="cursor-pointer text-indigo-400 hover:text-indigo-600 transition-colors p-1 disabled:opacity-50"
+                                                  title="Gerar com IA"
+                                              >
+                                                  {isGeneratingImage === `${qIndex}-option-${oIndex}-undefined` ? (
+                                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                                  ) : (
+                                                      <Sparkles className="w-4 h-4" />
+                                                  )}
                                               </button>
                                               <label className="cursor-pointer text-slate-400 hover:text-indigo-600 transition-colors p-1" title="Subir Imagem">
                                                   <ImageIcon className="w-4 h-4" />
@@ -612,6 +703,18 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                                 <Search className="w-3 h-3" />
                                                                 Pesquisar
                                                             </button>
+                                                            <button
+                                                                onClick={() => openGenerateModal(qIndex, 'pair', pIndex, 'left')}
+                                                                disabled={isGeneratingImage === `${qIndex}-pair-${pIndex}-left`}
+                                                                className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer border border-indigo-200 disabled:opacity-50"
+                                                            >
+                                                                {isGeneratingImage === `${qIndex}-pair-${pIndex}-left` ? (
+                                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                                ) : (
+                                                                    <Sparkles className="w-3 h-3" />
+                                                                )}
+                                                                Gerar
+                                                            </button>
                                                             <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200">
                                                                 <ImageIcon className="w-3 h-3" />
                                                                 Subir
@@ -668,6 +771,18 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                             >
                                                                 <Search className="w-3 h-3" />
                                                                 Pesquisar
+                                                            </button>
+                                                            <button
+                                                                onClick={() => openGenerateModal(qIndex, 'pair', pIndex, 'right')}
+                                                                disabled={isGeneratingImage === `${qIndex}-pair-${pIndex}-right`}
+                                                                className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer border border-indigo-200 disabled:opacity-50"
+                                                            >
+                                                                {isGeneratingImage === `${qIndex}-pair-${pIndex}-right` ? (
+                                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                                ) : (
+                                                                    <Sparkles className="w-3 h-3" />
+                                                                )}
+                                                                Gerar
                                                             </button>
                                                             <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200">
                                                                 <ImageIcon className="w-3 h-3" />
@@ -750,6 +865,67 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
         onClose={() => setSearchModalOpen(false)}
         onSelect={handleImageSelect}
       />
+
+      <AnimatePresence>
+        {generateModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-indigo-500" />
+                  Gerar Imagem com IA
+                </h3>
+                <button 
+                  onClick={() => setGenerateModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Descreva a imagem desejada:
+                  </label>
+                  <textarea
+                    value={generatePrompt}
+                    onChange={(e) => setGeneratePrompt(e.target.value)}
+                    placeholder="Ex: Um cachorro astronauta em marte..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm h-32 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setGenerateModalOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={submitGenerateImage}
+                  disabled={!generatePrompt.trim()}
+                  icon={<Sparkles className="w-4 h-4" />}
+                >
+                  Gerar Imagem
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

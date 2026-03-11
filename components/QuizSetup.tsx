@@ -25,6 +25,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
   const [playerList, setPlayerList] = useState<string[]>(['Jogador 1', 'Jogador 2']);
   const [arcadeMap, setArcadeMap] = useState<ArcadeMap>('overworld');
   const [textualGenre, setTextualGenre] = useState('Dissertativo-argumentativo');
+  const [generateImages, setGenerateImages] = useState(false);
 
   const handleAddPlayer = () => {
       if (playerList.length < 4) {
@@ -126,7 +127,8 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
           arcadeMap: gameMode === 'arcade' ? (isStoryMode ? 'overworld' : arcadeMap) : undefined,
           teachingStyle,
           questionTypes: finalQuestionTypes,
-          textualGenre: (finalQuestionTypes.includes('ESSAY') || gameMode === 'essay_challenge') ? textualGenre : undefined
+          textualGenre: (finalQuestionTypes.includes('ESSAY') || gameMode === 'essay_challenge') ? textualGenre : undefined,
+          generateImages
       });
     }
   };
@@ -410,6 +412,26 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                         </div>
                     </div>
                 )}
+
+                {/* Generate Images Toggle */}
+                <div className="md:col-span-2">
+                    <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 transition-colors">
+                        <div className={`w-10 h-6 rounded-full relative transition-colors ${generateImages ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                            <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${generateImages ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            className="hidden" 
+                            checked={generateImages} 
+                            onChange={(e) => setGenerateImages(e.target.checked)} 
+                        />
+                        <div className="flex items-center gap-2">
+                            <Palette className={`w-5 h-5 ${generateImages ? 'text-indigo-600' : 'text-slate-400'}`} />
+                            <span className={`font-medium ${generateImages ? 'text-indigo-900' : 'text-slate-600'}`}>Gerar Imagens para Enunciados</span>
+                            <Tooltip id="generateImages" text="A IA criará imagens ilustrativas para as perguntas (pode aumentar o tempo de geração)." />
+                        </div>
+                    </label>
+                </div>
 
                 {/* Teaching Style */}
                 <div className="space-y-3">

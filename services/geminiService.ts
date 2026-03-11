@@ -1,12 +1,42 @@
 import { QuizData, Difficulty, QuizConfig, EssayEvaluation } from "../types";
 
-const API_KEY = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY;
-const IS_OPENROUTER = !!process.env.OPENROUTER_API_KEY || (API_KEY?.startsWith('sk-or-') ?? false);
+import { GoogleGenAI } from "@google/genai";
+
+const API_KEY = process.env.OPENROUTER_API_KEY;
+const IS_OPENROUTER = API_KEY?.startsWith('sk-or-') ?? false;
 const BASE_URL = IS_OPENROUTER ? "https://openrouter.ai/api/v1" : "https://generativelanguage.googleapis.com/v1beta";
 
 export const generateImage = async (prompt: string, size: "512px" | "1K" | "2K" | "4K" = "1K"): Promise<string | null> => {
-  // Image generation disabled by user request
-  return null;
+  const IMAGE_API_KEY = process.env.QUIZ_GEN_IMAGES;
+  if (!IMAGE_API_KEY) {
+    console.warn("QUIZ_GEN_IMAGES não configurada. Geração de imagens desativada.");
+    return null;
+  }
+  
+  try {
+    const ai = new GoogleGenAI({ apiKey: IMAGE_API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          {
+            text: prompt,
+          },
+        ],
+      },
+    });
+    
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        const base64EncodeString = part.inlineData.data;
+        return `data:image/png;base64,${base64EncodeString}`;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Erro ao gerar imagem:", error);
+    return null;
+  }
 };
 
 export const generateSpeech = async (text: string): Promise<string | null> => {
@@ -291,7 +321,7 @@ export const generateQuiz = async (
     Diretrizes Gerais:
     - Certifique-se de que as perguntas sejam claras, as opções sejam plausíveis e a explicação seja útil.
     - O título do quiz deve ser criativo e relacionado ao tópico.
-    - Utilize 'questionImage: true' para gerar imagens ilustrativas para o enunciado das perguntas sempre que possível, especialmente para perguntas que descrevem cenários, objetos ou animais.
+    ${config.generateImages ? "- Utilize 'questionImage: true' para gerar imagens ilustrativas para o enunciado das perguntas sempre que possível.\n    - Utilize 'optionImages' (array de booleanos) para gerar imagens para as alternativas de Múltipla Escolha, se fizer sentido visualmente.\n    - Para perguntas de Relacionar Colunas (MATCHING), você pode definir 'leftImage: true' ou 'rightImage: true' nos pares para gerar imagens correspondentes." : "- NÃO gere imagens para as perguntas, opções ou pares (defina questionImage, optionImages, leftImage e rightImage como false)."}
   `;
 
   const responseSchema = {
@@ -318,7 +348,9 @@ export const generateQuiz = async (
                 type: "object",
                 properties: {
                   left: { type: "string" },
-                  right: { type: "string" }
+                  right: { type: "string" },
+                  leftImage: { type: "boolean" },
+                  rightImage: { type: "boolean" }
                 }
               }
             }
@@ -363,6 +395,32 @@ export const generateQuiz = async (
                       }
                   }
                   return null;
+              }));
+          }
+
+          if (q.type === 'MATCHING' && q.pairs) {
+              await Promise.all(q.pairs.map(async (pair: any) => {
+                  if (pair.leftImage) {
+                      try {
+                          pair.leftImage = await generateImage(pair.left, "512px");
+                      } catch (e) {
+                          console.error("Failed to generate left pair image", e);
+                          pair.leftImage = undefined;
+                      }
+                  } else {
+                      pair.leftImage = undefined;
+                  }
+                  
+                  if (pair.rightImage) {
+                      try {
+                          pair.rightImage = await generateImage(pair.right, "512px");
+                      } catch (e) {
+                          console.error("Failed to generate right pair image", e);
+                          pair.rightImage = undefined;
+                      }
+                  } else {
+                      pair.rightImage = undefined;
+                  }
               }));
           }
       }));
