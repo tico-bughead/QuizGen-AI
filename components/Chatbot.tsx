@@ -186,7 +186,7 @@ export const Chatbot: React.FC = () => {
       {/* Floating Action Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-700 hover:scale-105 transition-all z-50 ${isOpen ? 'hidden' : 'flex'}`}
+        className={`fixed bottom-6 right-6 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-700 hover:scale-105 transition-all z-50 tour-chatbot ${isOpen ? 'hidden' : 'flex'}`}
       >
         <MessageSquare className="w-6 h-6" />
       </button>

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './Button';
-import { BrainCircuit, Sparkles, Gamepad2, Users, Trophy, ArrowRight, PenTool, AlertCircle } from 'lucide-react';
+import { BrainCircuit, Sparkles, Gamepad2, Users, Trophy, ArrowRight, PenTool, AlertCircle, HelpCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import Joyride, { Step, CallBackProps, STATUS } from 'react-joyride';
 
 interface HomePageProps {
   onStart: () => void;
@@ -10,9 +11,80 @@ interface HomePageProps {
 }
 
 export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate, onEssayGenerator }) => {
+  const [runTutorial, setRunTutorial] = useState(false);
+
+  const steps: Step[] = [
+    {
+      target: '.tour-welcome',
+      content: 'Bem-vindo ao QuizGen AI! Aqui você pode criar quizzes incríveis e praticar redações com a ajuda da Inteligência Artificial.',
+      disableBeacon: true,
+    },
+    {
+      target: '.tour-features',
+      content: 'Estas são as principais funcionalidades do app: geração com IA, modos de jogo variados, multiplayer local e prática de redação.',
+    },
+    {
+      target: '.tour-generate-ai',
+      content: 'Clique aqui para gerar um quiz ou tema de redação automaticamente usando Inteligência Artificial. Você poderá escolher o tema, dificuldade e modo de jogo!',
+    },
+    {
+      target: '.tour-create-manual',
+      content: 'Prefere criar suas próprias perguntas? Use esta opção para montar um quiz manualmente, passo a passo.',
+    },
+    {
+      target: '.tour-essay-models',
+      content: 'Acesse aqui para gerar modelos de redação nota 1000, baixar folhas de rascunho e praticar para o ENEM e outros vestibulares.',
+    },
+    {
+      target: '.tour-chatbot',
+      content: 'Tem alguma dúvida? Nosso assistente virtual está sempre disponível aqui no canto inferior direito para te ajudar com dicas de estudo!',
+    }
+  ];
+
+  const handleJoyrideCallback = (data: CallBackProps) => {
+    const { status } = data;
+    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
+    if (finishedStatuses.includes(status)) {
+      setRunTutorial(false);
+    }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto w-full">
-      <div className="text-center mb-12">
+    <div className="max-w-4xl mx-auto w-full relative">
+      <Joyride
+        steps={steps}
+        run={runTutorial}
+        continuous={true}
+        showProgress={true}
+        showSkipButton={true}
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#4f46e5',
+            zIndex: 10000,
+          }
+        }}
+        locale={{
+          back: 'Anterior',
+          close: 'Fechar',
+          last: 'Finalizar',
+          next: 'Próximo',
+          skip: 'Pular'
+        }}
+      />
+
+      <div className="absolute top-0 right-0 z-10">
+        <Button 
+          onClick={() => setRunTutorial(true)} 
+          variant="outline" 
+          className="bg-white/80 backdrop-blur-sm text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+          icon={<HelpCircle className="w-5 h-5" />}
+        >
+          Ver Tutorial
+        </Button>
+      </div>
+
+      <div className="text-center mb-12 tour-welcome pt-12">
         <motion.div
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -45,7 +117,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate, onEssayGe
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.4 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 tour-features"
       >
         <div className="bg-white p-6 rounded-3xl shadow-xl border border-slate-100 hover:shadow-2xl transition-shadow">
           <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center mb-4 text-indigo-600">
@@ -86,29 +158,35 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate, onEssayGe
         transition={{ delay: 0.6 }}
         className="flex flex-col sm:flex-row gap-4 justify-center"
       >
-        <Button 
-          onClick={onStart} 
-          className="py-4 px-12 text-xl shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/40"
-          icon={<Sparkles className="w-6 h-6" />}
-        >
-          Gerar com IA
-        </Button>
-        <Button 
-          onClick={onCreate} 
-          variant="outline"
-          className="py-4 px-12 text-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 shadow-lg"
-          icon={<BrainCircuit className="w-6 h-6" />}
-        >
-          Criar Quiz
-        </Button>
-        <Button 
-          onClick={onEssayGenerator} 
-          variant="outline"
-          className="py-4 px-12 text-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 shadow-lg"
-          icon={<PenTool className="w-6 h-6" />}
-        >
-          Modelos de Redação
-        </Button>
+        <div className="tour-generate-ai">
+          <Button 
+            onClick={onStart} 
+            className="py-4 px-12 text-xl shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/40 w-full"
+            icon={<Sparkles className="w-6 h-6" />}
+          >
+            Gerar com IA
+          </Button>
+        </div>
+        <div className="tour-create-manual">
+          <Button 
+            onClick={onCreate} 
+            variant="outline"
+            className="py-4 px-12 text-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 shadow-lg w-full"
+            icon={<BrainCircuit className="w-6 h-6" />}
+          >
+            Criar Quiz
+          </Button>
+        </div>
+        <div className="tour-essay-models">
+          <Button 
+            onClick={onEssayGenerator} 
+            variant="outline"
+            className="py-4 px-12 text-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 shadow-lg w-full"
+            icon={<PenTool className="w-6 h-6" />}
+          >
+            Modelos de Redação
+          </Button>
+        </div>
       </motion.div>
     </div>
   );
