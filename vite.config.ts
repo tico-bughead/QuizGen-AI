@@ -11,9 +11,10 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY?.trim()),
+        'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY?.trim()),
         'process.env.QUIZ_GEN_CHAT': JSON.stringify(env.QUIZ_GEN_CHAT?.trim()),
-        'process.env.QUIZ_GEN_IMAGES': JSON.stringify(env.QUIZ_GEN_IMAGES?.trim())
+        'process.env.QUIZ_GEN_IMAGES': JSON.stringify(env.QUIZ_GEN_IMAGES?.trim()),
+        'process.env.VITE_OPENROUTER_API_KEY': JSON.stringify(env.VITE_OPENROUTER_API_KEY?.trim()),
       },
       resolve: {
         alias: {

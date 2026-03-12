@@ -4,6 +4,7 @@ import { PenTool, Download, Sparkles, FileText, ArrowLeft, Loader2 } from 'lucid
 import { motion } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import { generateEssayModel, generateEssayTopic } from '../services/geminiService';
+import { getDraftStructureForGenre } from '../utils/genreStructures';
 
 interface EssayTemplateGeneratorProps {
   onBack: () => void;
@@ -50,7 +51,8 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
     doc.setFontSize(16);
     doc.text("Folha de Redação", 105, 20, { align: "center" });
     doc.setFontSize(12);
-    doc.text(`Tema: ${topic || "__________________________________________________"}`, 20, 30);
+    const isDissertativo = textualGenre.toLowerCase().includes('dissertativo-argumentativo');
+    doc.text(`${isDissertativo ? 'Tema' : 'Título'}: ${topic || "__________________________________________________"}`, 20, 30);
     
     // Lines
     let y = 50;
@@ -75,78 +77,99 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
     // Title
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("RASCUNHÃO", pageWidth / 2, y, { align: "center" });
+    doc.text(`RASCUNHÃO (${textualGenre})`, pageWidth / 2, y, { align: "center" });
     y += 15;
 
     // Topic
+    const isDissertativo = textualGenre.toLowerCase().includes('dissertativo-argumentativo');
     doc.setFontSize(12);
-    doc.text("TEMA:", 20, y);
+    doc.text(`${isDissertativo ? 'TEMA' : 'TÍTULO'}:`, 20, y);
     doc.setFont("helvetica", "normal");
     const splitTopic = doc.splitTextToSize(topic || "__________________________________________________", pageWidth - 50);
     doc.text(splitTopic, 40, y);
     y += splitTopic.length * 7 + 10;
 
-    // Introduction
-    doc.setFont("helvetica", "bold");
-    doc.text("Introdução:", 20, y);
-    y += 8;
-    doc.setFont("helvetica", "normal");
-    doc.text("problema x: _________________________________________________________", 25, y);
-    y += 8;
-    doc.text("_____________________________________________________________________", 25, y);
-    y += 10;
-    doc.text("problema y: _________________________________________________________", 25, y);
-    y += 8;
-    doc.text("_____________________________________________________________________", 25, y);
-    y += 15;
-
-    // Development
-    doc.setFont("helvetica", "bold");
-    doc.text("Desenvolvimento:", 20, y);
-    y += 8;
-    
-    // D1
-    doc.text("D1:", 25, y);
-    y += 8;
-    doc.setFont("helvetica", "normal");
-    doc.text("A1 (argumento 1): ___________________________________________________", 30, y);
-    y += 8;
-    doc.text("_____________________________________________________________________", 30, y);
-    y += 10;
-    doc.text("R1 (repertório 1): __________________________________________________", 30, y);
-    y += 8;
-    doc.text("_____________________________________________________________________", 30, y);
-    y += 12;
-
-    // D2
-    doc.setFont("helvetica", "bold");
-    doc.text("D2:", 25, y);
-    y += 8;
-    doc.setFont("helvetica", "normal");
-    doc.text("A2 (argumento 2): ___________________________________________________", 30, y);
-    y += 8;
-    doc.text("_____________________________________________________________________", 30, y);
-    y += 10;
-    doc.text("R2 (repertório 2): __________________________________________________", 30, y);
-    y += 8;
-    doc.text("_____________________________________________________________________", 30, y);
-    y += 15;
-
-    // Conclusion
-    doc.setFont("helvetica", "bold");
-    doc.text("Conclusão:", 20, y);
-    y += 8;
-    doc.text("P.I (proposta de intervenção):", 25, y);
-    y += 8;
-    doc.setFont("helvetica", "normal");
-    
-    const piItems = ["AGENTE", "AÇÃO", "MODO/MEIO", "FINALIDADE"];
-    piItems.forEach(item => {
-        doc.text(`- ${item}: _____________________________________________________________`, 30, y);
+    if (isDissertativo) {
+        // Introduction
+        doc.setFont("helvetica", "bold");
+        doc.text("Introdução:", 20, y);
         y += 8;
-        doc.text("_______________________________________________________________________", 32, y);
+        doc.setFont("helvetica", "normal");
+        doc.text("problema x: _________________________________________________________", 25, y);
+        y += 8;
+        doc.text("_____________________________________________________________________", 25, y);
         y += 10;
-    });
+        doc.text("problema y: _________________________________________________________", 25, y);
+        y += 8;
+        doc.text("_____________________________________________________________________", 25, y);
+        y += 15;
+
+        // Development
+        doc.setFont("helvetica", "bold");
+        doc.text("Desenvolvimento:", 20, y);
+        y += 8;
+        
+        // D1
+        doc.text("D1:", 25, y);
+        y += 8;
+        doc.setFont("helvetica", "normal");
+        doc.text("A1 (argumento 1): ___________________________________________________", 30, y);
+        y += 8;
+        doc.text("_____________________________________________________________________", 30, y);
+        y += 10;
+        doc.text("R1 (repertório 1): __________________________________________________", 30, y);
+        y += 8;
+        doc.text("_____________________________________________________________________", 30, y);
+        y += 12;
+
+        // D2
+        doc.setFont("helvetica", "bold");
+        doc.text("D2:", 25, y);
+        y += 8;
+        doc.setFont("helvetica", "normal");
+        doc.text("A2 (argumento 2): ___________________________________________________", 30, y);
+        y += 8;
+        doc.text("_____________________________________________________________________", 30, y);
+        y += 10;
+        doc.text("R2 (repertório 2): __________________________________________________", 30, y);
+        y += 8;
+        doc.text("_____________________________________________________________________", 30, y);
+        y += 15;
+
+        // Conclusion
+        doc.setFont("helvetica", "bold");
+        doc.text("Conclusão:", 20, y);
+        y += 8;
+        doc.text("P.I (proposta de intervenção):", 25, y);
+        y += 8;
+        doc.setFont("helvetica", "normal");
+        
+        const piItems = ["AGENTE", "AÇÃO", "MODO/MEIO", "FINALIDADE"];
+        piItems.forEach(item => {
+            doc.text(`- ${item}: _____________________________________________________________`, 30, y);
+            y += 8;
+            doc.text("_______________________________________________________________________", 32, y);
+            y += 10;
+        });
+    } else {
+        const structure = getDraftStructureForGenre(textualGenre);
+        structure.forEach(field => {
+            if (y > 260) {
+                doc.addPage();
+                y = 20;
+            }
+            doc.setFont("helvetica", "bold");
+            doc.text(`${field.label}:`, 20, y);
+            y += 8;
+            doc.setFont("helvetica", "normal");
+            doc.text("_____________________________________________________________________", 25, y);
+            y += 8;
+            doc.text("_____________________________________________________________________", 25, y);
+            y += 8;
+            doc.text("_____________________________________________________________________", 25, y);
+            y += 15;
+        });
+    }
 
     const fileName = window.prompt("Digite o nome do arquivo:", "rascunhao_redacao") || "rascunhao_redacao";
     doc.save(`${fileName}.pdf`);
@@ -251,18 +274,16 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
                     <span className="text-xs text-slate-400 font-normal">PDF com pauta de 30 linhas</span>
                 </Button>
 
-                {textualGenre.toLowerCase().includes('dissertativo-argumentativo') && (
-                    <Button 
-                        onClick={handleDownloadDraft}
-                        disabled={!topic.trim()}
-                        variant="outline"
-                        className="h-auto py-4 flex flex-col items-center gap-2 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 group"
-                    >
-                        <PenTool className="w-8 h-8 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                        <span className="font-medium text-slate-700 group-hover:text-indigo-700">Baixar Rascunhão</span>
-                        <span className="text-xs text-slate-400 font-normal">Estrutura para planejamento</span>
-                    </Button>
-                )}
+                <Button 
+                    onClick={handleDownloadDraft}
+                    disabled={!topic.trim()}
+                    variant="outline"
+                    className="h-auto py-4 flex flex-col items-center gap-2 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 group"
+                >
+                    <PenTool className="w-8 h-8 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                    <span className="font-medium text-slate-700 group-hover:text-indigo-700">Baixar Rascunhão</span>
+                    <span className="text-xs text-slate-400 font-normal">Estrutura para planejamento</span>
+                </Button>
 
                 <Button 
                     onClick={handleGenerateModel}

@@ -1,38 +1,8 @@
 import { QuizData, Difficulty, QuizConfig, EssayEvaluation } from "../types";
 
-import { GoogleGenAI } from "@google/genai";
-
 export const generateImage = async (prompt: string, size: "512px" | "1K" | "2K" | "4K" = "1K"): Promise<string | null> => {
-  const IMAGE_API_KEY = process.env.QUIZ_GEN_IMAGES || process.env.GEMINI_API_KEY;
-  if (!IMAGE_API_KEY) {
-    console.warn("QUIZ_GEN_IMAGES ou GEMINI_API_KEY não configurada. Geração de imagens desativada.");
-    return null;
-  }
-  
-  try {
-    const ai = new GoogleGenAI({ apiKey: IMAGE_API_KEY });
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [
-          {
-            text: prompt,
-          },
-        ],
-      },
-    });
-    
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        const base64EncodeString = part.inlineData.data;
-        return `data:image/png;base64,${base64EncodeString}`;
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error("Erro ao gerar imagem:", error);
-    return null;
-  }
+  console.warn("Geração de imagens não é suportada diretamente via OpenRouter no momento.");
+  return null;
 };
 
 export const generateSpeech = async (text: string): Promise<string | null> => {
@@ -44,10 +14,8 @@ export const generateSpeech = async (text: string): Promise<string | null> => {
 };
 
 const callGemini = async (prompt: string, systemInstruction: string, responseSchema?: any) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
-
-  const ai = new GoogleGenAI({ apiKey });
+  const apiKey = process.env.OPENROUTER_API_KEY || import.meta.env.VITE_OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("Chave de API do OpenRouter não configurada.");
 
   let finalPrompt = prompt;
   if (responseSchema) {
@@ -55,19 +23,34 @@ const callGemini = async (prompt: string, systemInstruction: string, responseSch
   }
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: finalPrompt,
-      config: {
-        systemInstruction: systemInstruction,
-        responseMimeType: responseSchema ? "application/json" : "text/plain",
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": window.location.href,
+        "X-Title": "QuizGen AI",
+      },
+      body: JSON.stringify({
+        model: "openrouter/free", // Using a free model on OpenRouter
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: finalPrompt }
+        ],
+        response_format: responseSchema ? { type: "json_object" } : undefined,
         temperature: 0.7,
-      }
+      })
     });
 
-    return response.text || "";
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`OpenRouter API error: ${response.status} - ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content || "";
   } catch (error) {
-    console.error("Erro na chamada à API do Gemini:", error);
+    console.error("Erro na chamada à API do OpenRouter:", error);
     throw error;
   }
 };

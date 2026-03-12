@@ -40,6 +40,7 @@ const THEME_MUSIC: Record<QuizTheme, string> = {
 };
 
 import { generateSpeech, evaluateEssay } from '../services/geminiService';
+import { getDraftStructureForGenre } from '../utils/genreStructures';
 
 interface EssayDraft {
   introProblemX: string;
@@ -52,6 +53,7 @@ interface EssayDraft {
   conclusionAction: string;
   conclusionMode: string;
   conclusionPurpose: string;
+  genericDraft: Record<string, string>;
 }
 
 export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
@@ -79,7 +81,8 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
     introProblemX: '', introProblemY: '',
     d1Argument: '', d1Repertoire: '',
     d2Argument: '', d2Repertoire: '',
-    conclusionAgent: '', conclusionAction: '', conclusionMode: '', conclusionPurpose: ''
+    conclusionAgent: '', conclusionAction: '', conclusionMode: '', conclusionPurpose: '',
+    genericDraft: {}
   });
   const [essayPhase, setEssayPhase] = useState<'DRAFT' | 'FINAL'>('DRAFT');
   
@@ -579,7 +582,8 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
             introProblemX: '', introProblemY: '',
             d1Argument: '', d1Repertoire: '',
             d2Argument: '', d2Repertoire: '',
-            conclusionAgent: '', conclusionAction: '', conclusionMode: '', conclusionPurpose: ''
+            conclusionAgent: '', conclusionAction: '', conclusionMode: '', conclusionPurpose: '',
+            genericDraft: {}
           });
           setEssayPhase('DRAFT');
 
@@ -1295,7 +1299,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                         </Button>
                     </div>
 
-                    {essayPhase === 'DRAFT' && (!question.textualGenre || question.textualGenre.toLowerCase().includes('dissertativo-argumentativo')) ? (
+                    {essayPhase === 'DRAFT' ? (
                         <div className="space-y-4 bg-white/50 p-4 rounded-2xl border border-slate-200">
                             <div className="flex justify-between items-center mb-2">
                                 <h3 className="font-bold text-lg text-slate-700 flex items-center gap-2">
@@ -1306,67 +1310,92 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                             </div>
                             
                             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                                {/* Introdução */}
-                                <div className="space-y-2">
-                                    <h4 className="font-semibold text-sm text-indigo-700">Introdução</h4>
-                                    <input 
-                                        placeholder="Problema X" 
-                                        className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                                        value={essayDraft.introProblemX}
-                                        onChange={e => setEssayDraft({...essayDraft, introProblemX: e.target.value})}
-                                    />
-                                    <input 
-                                        placeholder="Problema Y" 
-                                        className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                                        value={essayDraft.introProblemY}
-                                        onChange={e => setEssayDraft({...essayDraft, introProblemY: e.target.value})}
-                                    />
-                                </div>
+                                {(!question.textualGenre || question.textualGenre.toLowerCase().includes('dissertativo-argumentativo')) ? (
+                                    <>
+                                        {/* Introdução */}
+                                        <div className="space-y-2">
+                                            <h4 className="font-semibold text-sm text-indigo-700">Introdução</h4>
+                                            <input 
+                                                placeholder="Problema X" 
+                                                className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                                                value={essayDraft.introProblemX}
+                                                onChange={e => setEssayDraft({...essayDraft, introProblemX: e.target.value})}
+                                            />
+                                            <input 
+                                                placeholder="Problema Y" 
+                                                className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                                                value={essayDraft.introProblemY}
+                                                onChange={e => setEssayDraft({...essayDraft, introProblemY: e.target.value})}
+                                            />
+                                        </div>
 
-                                {/* Desenvolvimento 1 */}
-                                <div className="space-y-2">
-                                    <h4 className="font-semibold text-sm text-indigo-700">Desenvolvimento 1</h4>
-                                    <input 
-                                        placeholder="Argumento 1" 
-                                        className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                                        value={essayDraft.d1Argument}
-                                        onChange={e => setEssayDraft({...essayDraft, d1Argument: e.target.value})}
-                                    />
-                                    <input 
-                                        placeholder="Repertório 1" 
-                                        className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                                        value={essayDraft.d1Repertoire}
-                                        onChange={e => setEssayDraft({...essayDraft, d1Repertoire: e.target.value})}
-                                    />
-                                </div>
+                                        {/* Desenvolvimento 1 */}
+                                        <div className="space-y-2">
+                                            <h4 className="font-semibold text-sm text-indigo-700">Desenvolvimento 1</h4>
+                                            <input 
+                                                placeholder="Argumento 1" 
+                                                className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                                                value={essayDraft.d1Argument}
+                                                onChange={e => setEssayDraft({...essayDraft, d1Argument: e.target.value})}
+                                            />
+                                            <input 
+                                                placeholder="Repertório 1" 
+                                                className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                                                value={essayDraft.d1Repertoire}
+                                                onChange={e => setEssayDraft({...essayDraft, d1Repertoire: e.target.value})}
+                                            />
+                                        </div>
 
-                                {/* Desenvolvimento 2 */}
-                                <div className="space-y-2">
-                                    <h4 className="font-semibold text-sm text-indigo-700">Desenvolvimento 2</h4>
-                                    <input 
-                                        placeholder="Argumento 2" 
-                                        className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                                        value={essayDraft.d2Argument}
-                                        onChange={e => setEssayDraft({...essayDraft, d2Argument: e.target.value})}
-                                    />
-                                    <input 
-                                        placeholder="Repertório 2" 
-                                        className="w-full p-2 rounded-lg border border-slate-300 text-sm"
-                                        value={essayDraft.d2Repertoire}
-                                        onChange={e => setEssayDraft({...essayDraft, d2Repertoire: e.target.value})}
-                                    />
-                                </div>
+                                        {/* Desenvolvimento 2 */}
+                                        <div className="space-y-2">
+                                            <h4 className="font-semibold text-sm text-indigo-700">Desenvolvimento 2</h4>
+                                            <input 
+                                                placeholder="Argumento 2" 
+                                                className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                                                value={essayDraft.d2Argument}
+                                                onChange={e => setEssayDraft({...essayDraft, d2Argument: e.target.value})}
+                                            />
+                                            <input 
+                                                placeholder="Repertório 2" 
+                                                className="w-full p-2 rounded-lg border border-slate-300 text-sm"
+                                                value={essayDraft.d2Repertoire}
+                                                onChange={e => setEssayDraft({...essayDraft, d2Repertoire: e.target.value})}
+                                            />
+                                        </div>
 
-                                {/* Conclusão */}
-                                <div className="space-y-2">
-                                    <h4 className="font-semibold text-sm text-indigo-700">Conclusão (Proposta de Intervenção)</h4>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <input placeholder="Agente" className="p-2 rounded-lg border border-slate-300 text-sm" value={essayDraft.conclusionAgent} onChange={e => setEssayDraft({...essayDraft, conclusionAgent: e.target.value})} />
-                                        <input placeholder="Ação" className="p-2 rounded-lg border border-slate-300 text-sm" value={essayDraft.conclusionAction} onChange={e => setEssayDraft({...essayDraft, conclusionAction: e.target.value})} />
-                                        <input placeholder="Modo/Meio" className="p-2 rounded-lg border border-slate-300 text-sm" value={essayDraft.conclusionMode} onChange={e => setEssayDraft({...essayDraft, conclusionMode: e.target.value})} />
-                                        <input placeholder="Finalidade" className="p-2 rounded-lg border border-slate-300 text-sm" value={essayDraft.conclusionPurpose} onChange={e => setEssayDraft({...essayDraft, conclusionPurpose: e.target.value})} />
+                                        {/* Conclusão */}
+                                        <div className="space-y-2">
+                                            <h4 className="font-semibold text-sm text-indigo-700">Conclusão (Proposta de Intervenção)</h4>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <input placeholder="Agente" className="p-2 rounded-lg border border-slate-300 text-sm" value={essayDraft.conclusionAgent} onChange={e => setEssayDraft({...essayDraft, conclusionAgent: e.target.value})} />
+                                                <input placeholder="Ação" className="p-2 rounded-lg border border-slate-300 text-sm" value={essayDraft.conclusionAction} onChange={e => setEssayDraft({...essayDraft, conclusionAction: e.target.value})} />
+                                                <input placeholder="Modo/Meio" className="p-2 rounded-lg border border-slate-300 text-sm" value={essayDraft.conclusionMode} onChange={e => setEssayDraft({...essayDraft, conclusionMode: e.target.value})} />
+                                                <input placeholder="Finalidade" className="p-2 rounded-lg border border-slate-300 text-sm" value={essayDraft.conclusionPurpose} onChange={e => setEssayDraft({...essayDraft, conclusionPurpose: e.target.value})} />
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <h4 className="font-semibold text-sm text-indigo-700">Estrutura do Texto ({question.textualGenre})</h4>
+                                        {getDraftStructureForGenre(question.textualGenre).map(field => (
+                                            <div key={field.id} className="space-y-1">
+                                                <label className="text-xs font-medium text-slate-600">{field.label}</label>
+                                                <textarea 
+                                                    placeholder={field.placeholder} 
+                                                    className="w-full p-2 rounded-lg border border-slate-300 text-sm min-h-[80px] resize-y"
+                                                    value={essayDraft.genericDraft[field.id] || ''}
+                                                    onChange={e => setEssayDraft({
+                                                        ...essayDraft, 
+                                                        genericDraft: {
+                                                            ...essayDraft.genericDraft,
+                                                            [field.id]: e.target.value
+                                                        }
+                                                    })}
+                                                />
+                                            </div>
+                                        ))}
                                     </div>
-                                </div>
+                                )}
                             </div>
 
                             <Button 
@@ -1380,46 +1409,57 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Draft View (Sidebar on Desktop, Top on Mobile) */}
-                            {(!question.textualGenre || question.textualGenre.toLowerCase().includes('dissertativo-argumentativo')) && (
-                                <div className="md:col-span-1 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs overflow-y-auto max-h-[300px] md:max-h-[500px]">
-                                    <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-1">
-                                        <PenTool className="w-3 h-3" /> Seu Rascunho
-                                    </h4>
-                                    <div className="space-y-3 text-slate-600">
-                                        <div>
-                                            <strong className="block text-indigo-600">Intro:</strong>
-                                            <p>X: {essayDraft.introProblemX || '-'}</p>
-                                            <p>Y: {essayDraft.introProblemY || '-'}</p>
-                                        </div>
-                                        <div>
-                                            <strong className="block text-indigo-600">D1:</strong>
-                                            <p>Arg: {essayDraft.d1Argument || '-'}</p>
-                                            <p>Rep: {essayDraft.d1Repertoire || '-'}</p>
-                                        </div>
-                                        <div>
-                                            <strong className="block text-indigo-600">D2:</strong>
-                                            <p>Arg: {essayDraft.d2Argument || '-'}</p>
-                                            <p>Rep: {essayDraft.d2Repertoire || '-'}</p>
-                                        </div>
-                                        <div>
-                                            <strong className="block text-indigo-600">Conclusão:</strong>
-                                            <p>Agente: {essayDraft.conclusionAgent || '-'}</p>
-                                            <p>Ação: {essayDraft.conclusionAction || '-'}</p>
-                                            <p>Modo: {essayDraft.conclusionMode || '-'}</p>
-                                            <p>Finalidade: {essayDraft.conclusionPurpose || '-'}</p>
-                                        </div>
-                                        <button 
-                                            onClick={() => setEssayPhase('DRAFT')}
-                                            className="text-indigo-500 underline mt-2 hover:text-indigo-700"
-                                        >
-                                            Editar Rascunho
-                                        </button>
-                                    </div>
+                            <div className="md:col-span-1 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs overflow-y-auto max-h-[300px] md:max-h-[500px]">
+                                <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-1">
+                                    <PenTool className="w-3 h-3" /> Seu Rascunho
+                                </h4>
+                                <div className="space-y-3 text-slate-600">
+                                    {(!question.textualGenre || question.textualGenre.toLowerCase().includes('dissertativo-argumentativo')) ? (
+                                        <>
+                                            <div>
+                                                <strong className="block text-indigo-600">Intro:</strong>
+                                                <p>X: {essayDraft.introProblemX || '-'}</p>
+                                                <p>Y: {essayDraft.introProblemY || '-'}</p>
+                                            </div>
+                                            <div>
+                                                <strong className="block text-indigo-600">D1:</strong>
+                                                <p>Arg: {essayDraft.d1Argument || '-'}</p>
+                                                <p>Rep: {essayDraft.d1Repertoire || '-'}</p>
+                                            </div>
+                                            <div>
+                                                <strong className="block text-indigo-600">D2:</strong>
+                                                <p>Arg: {essayDraft.d2Argument || '-'}</p>
+                                                <p>Rep: {essayDraft.d2Repertoire || '-'}</p>
+                                            </div>
+                                            <div>
+                                                <strong className="block text-indigo-600">Conclusão:</strong>
+                                                <p>Agente: {essayDraft.conclusionAgent || '-'}</p>
+                                                <p>Ação: {essayDraft.conclusionAction || '-'}</p>
+                                                <p>Modo: {essayDraft.conclusionMode || '-'}</p>
+                                                <p>Finalidade: {essayDraft.conclusionPurpose || '-'}</p>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {getDraftStructureForGenre(question.textualGenre).map(field => (
+                                                <div key={field.id}>
+                                                    <strong className="block text-indigo-600">{field.label}:</strong>
+                                                    <p className="whitespace-pre-wrap">{essayDraft.genericDraft[field.id] || '-'}</p>
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
+                                    <button 
+                                        onClick={() => setEssayPhase('DRAFT')}
+                                        className="text-indigo-500 underline mt-2 hover:text-indigo-700"
+                                    >
+                                        Editar Rascunho
+                                    </button>
                                 </div>
-                            )}
+                            </div>
 
                             {/* Final Essay Textarea */}
-                            <div className={(!question.textualGenre || question.textualGenre.toLowerCase().includes('dissertativo-argumentativo')) ? "md:col-span-2" : "md:col-span-3"}>
+                            <div className="md:col-span-2">
                                 <textarea
                                     value={essayAnswer}
                                     onChange={(e) => setEssayAnswer(e.target.value)}

@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from '../firebase';
 import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import Markdown from 'react-markdown';
-import { GoogleGenAI } from '@google/genai';
 
 interface Message {
   id: string;
@@ -122,28 +121,41 @@ export const Chatbot: React.FC = () => {
         collapsedMessages.push({ role: 'user', content: userText });
       }
 
-      const API_KEY = process.env.QUIZ_GEN_CHAT || process.env.GEMINI_API_KEY;
-      if (!API_KEY) throw new Error("API Key não configurada.");
-
-      const ai = new GoogleGenAI({ apiKey: API_KEY });
+      const API_KEY = process.env.QUIZ_GEN_CHAT || process.env.OPENROUTER_API_KEY || import.meta.env.VITE_OPENROUTER_API_KEY;
+      if (!API_KEY) throw new Error("Chave de API do OpenRouter não configurada.");
 
       let modelText = "";
 
-      const geminiContents = collapsedMessages.map(m => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }]
-      }));
+      const openRouterMessages = [
+        { role: "system", content: "Você é um assistente educacional amigável e inteligente do QuizGen AI. Seu objetivo é ajudar os usuários a aprenderem novos conhecimentos, responderem dúvidas sobre tópicos variados e darem dicas de estudo. Seja claro, conciso e encorajador." },
+        ...collapsedMessages.map(m => ({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content
+        }))
+      ];
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: geminiContents,
-        config: {
-          systemInstruction: "Você é um assistente educacional amigável e inteligente do QuizGen AI. Seu objetivo é ajudar os usuários a aprenderem novos conhecimentos, responderem dúvidas sobre tópicos variados e darem dicas de estudo. Seja claro, conciso e encorajador.",
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.href,
+          "X-Title": "QuizGen AI",
+        },
+        body: JSON.stringify({
+          model: "openrouter/free", // Using a free model on OpenRouter
+          messages: openRouterMessages,
           temperature: 0.7,
-        }
+        })
       });
 
-      modelText = response.text || "Desculpe, não consegui gerar uma resposta.";
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`OpenRouter API error: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+      modelText = data.choices[0].message.content || "Desculpe, não consegui gerar uma resposta.";
 
       // Save model message
       await addDoc(collection(db, 'chatMessages'), {
