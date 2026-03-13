@@ -5,6 +5,8 @@ import { Button } from './Button';
 import { ChevronRight, CheckCircle2, Timer, AlertCircle, XCircle, Volume2, VolumeX, SkipForward, Heart, Zap, Shield, Hourglass, Trophy, TrendingUp, PenTool, Loader2, Download } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
+import { getYouTubeEmbedUrl } from '../utils/media';
+
 interface QuizGameProps {
   quiz: QuizData;
   onComplete: (answers: UserAnswers, score?: number | number[], essayEvaluations?: Record<number, EssayEvaluation>) => void;
@@ -1147,14 +1149,23 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
             <h2 className={`${styles.title} font-bold ${styles.textMain} mb-2 leading-relaxed flex flex-col items-center justify-center gap-4`}>
                 {question.video && (
                     <div className="w-full max-w-md aspect-video rounded-2xl overflow-hidden shadow-lg border-4 border-white/20 bg-black">
-                        <video 
-                            src={question.video} 
-                            controls 
-                            className="w-full h-full object-contain"
-                            onPlay={() => setIsVideoPlaying(true)}
-                            onPause={() => setIsVideoPlaying(false)}
-                            onEnded={() => setIsVideoPlaying(false)}
-                        />
+                        {getYouTubeEmbedUrl(question.video) ? (
+                            <iframe 
+                                src={getYouTubeEmbedUrl(question.video)!} 
+                                className="w-full h-full object-contain"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowFullScreen
+                            />
+                        ) : (
+                            <video 
+                                src={question.video} 
+                                controls 
+                                className="w-full h-full object-contain"
+                                onPlay={() => setIsVideoPlaying(true)}
+                                onPause={() => setIsVideoPlaying(false)}
+                                onEnded={() => setIsVideoPlaying(false)}
+                            />
+                        )}
                     </div>
                 )}
                 {question.image && (

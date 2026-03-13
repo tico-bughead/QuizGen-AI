@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, Loader2, Bot, User, Maximize2, Minimize2, PlusCircle } from 'lucide-react';
+import { MessageSquare, X, Send, Loader2, Bot, User, Maximize2, Minimize2, PlusCircle, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from '../firebase';
 import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import Markdown from 'react-markdown';
+import Joyride, { CallBackProps, STATUS, Step } from 'react-joyride';
 
 interface Message {
   id: string;
@@ -19,6 +20,36 @@ export const Chatbot: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [runTutorial, setRunTutorial] = useState(false);
+
+  const steps: Step[] = [
+    {
+      target: '.tour-chatbot-header',
+      content: 'Este é o seu assistente virtual! Ele pode te ajudar a criar quizzes, entender matérias e muito mais.',
+      disableBeacon: true,
+    },
+    {
+      target: '.tour-chatbot-new-chat',
+      content: 'Clique aqui para limpar a conversa atual e começar um novo chat.',
+    },
+    {
+      target: '.tour-chatbot-fullscreen',
+      content: 'Precisa de mais espaço? Clique aqui para expandir o chat para a tela inteira.',
+    },
+    {
+      target: '.tour-chatbot-input',
+      content: 'Digite sua dúvida ou pedido aqui e aperte Enter ou clique no botão de enviar.',
+    }
+  ];
+
+  const handleJoyrideCallback = (data: CallBackProps) => {
+    const { status } = data;
+    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
+
+    if (finishedStatuses.includes(status)) {
+      setRunTutorial(false);
+    }
+  };
   const [user, setUser] = useState(auth.currentUser);
 
   const [showConfirmClear, setShowConfirmClear] = useState(false);
@@ -183,6 +214,27 @@ export const Chatbot: React.FC = () => {
 
   return (
     <>
+      <Joyride
+        steps={steps}
+        run={runTutorial}
+        continuous={true}
+        showProgress={true}
+        showSkipButton={true}
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#4f46e5',
+            zIndex: 100000,
+          },
+        }}
+        locale={{
+          back: 'Voltar',
+          close: 'Fechar',
+          last: 'Concluir',
+          next: 'Próximo',
+          skip: 'Pular',
+        }}
+      />
       {/* Floating Action Button */}
       <button
         onClick={() => setIsOpen(true)}
@@ -205,22 +257,29 @@ export const Chatbot: React.FC = () => {
             }`}
           >
             {/* Header */}
-            <div className="bg-indigo-600 p-4 text-white flex items-center justify-between shadow-md">
+            <div className="bg-indigo-600 p-4 text-white flex items-center justify-between shadow-md tour-chatbot-header">
               <div className="flex items-center gap-2">
                 <Bot className="w-6 h-6" />
                 <h3 className="font-bold">QuizGen Tutor</h3>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setRunTutorial(true)}
+                  className="text-indigo-100 hover:text-white transition-colors p-1"
+                  title="Ver Tutorial"
+                >
+                  <HelpCircle className="w-5 h-5" />
+                </button>
                 <button 
                   onClick={handleNewChat} 
-                  className="text-indigo-100 hover:text-white transition-colors p-1"
+                  className="text-indigo-100 hover:text-white transition-colors p-1 tour-chatbot-new-chat"
                   title="Novo Chat"
                 >
                   <PlusCircle className="w-5 h-5" />
                 </button>
                 <button 
                   onClick={() => setIsFullScreen(!isFullScreen)} 
-                  className="text-indigo-100 hover:text-white transition-colors p-1 hidden sm:block"
+                  className="text-indigo-100 hover:text-white transition-colors p-1 hidden sm:block tour-chatbot-fullscreen"
                   title={isFullScreen ? "Minimizar" : "Tela Cheia"}
                 >
                   {isFullScreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
@@ -292,7 +351,7 @@ export const Chatbot: React.FC = () => {
             </div>
 
             {/* Input */}
-            <div className="p-3 bg-white border-t border-slate-100">
+            <div className="p-3 bg-white border-t border-slate-100 tour-chatbot-input">
               <form onSubmit={handleSend} className="flex gap-2">
                 <input
                   type="text"

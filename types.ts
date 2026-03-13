@@ -89,5 +89,6 @@ export interface QuizConfig {
   teachingStyle?: TeachingStyle;
   questionTypes?: QuestionType[];
   textualGenre?: string; // Preferred textual genre for AI generation
-  generateImages?: boolean; // Whether to generate images for questions
+  searchMedia?: boolean; // Whether to search for images/videos for questions
+  generateImages?: boolean; // Whether to generate images for questions using AI
 }

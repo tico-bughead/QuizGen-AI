@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Difficulty, QuizConfig, QuizTheme, GameMode, ArcadeMap, TeachingStyle, QuestionType } from '../types';
 import { Button } from './Button';
-import { BrainCircuit, Sparkles, BookOpen, Layers, Tv, Palette, Sun, Moon, Zap, Gamepad2, Trophy, Leaf, Snowflake, Flower2, Map, Mountain, Skull, Trees, Info, GraduationCap, PenTool, CheckSquare } from 'lucide-react';
+import { BrainCircuit, Sparkles, BookOpen, Layers, Tv, Palette, Sun, Moon, Zap, Gamepad2, Trophy, Leaf, Snowflake, Flower2, Map, Mountain, Skull, Trees, Info, GraduationCap, PenTool, CheckSquare, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import Joyride, { Step, CallBackProps, STATUS } from 'react-joyride';
 
 interface QuizSetupProps {
   onStart: (config: QuizConfig) => void;
@@ -10,6 +11,7 @@ interface QuizSetupProps {
 }
 
 export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) => {
+  const [runTutorial, setRunTutorial] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [topic, setTopic] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.Medium);
@@ -25,7 +27,48 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
   const [playerList, setPlayerList] = useState<string[]>(['Jogador 1', 'Jogador 2']);
   const [arcadeMap, setArcadeMap] = useState<ArcadeMap>('overworld');
   const [textualGenre, setTextualGenre] = useState('Dissertativo-argumentativo');
+  const [searchMedia, setSearchMedia] = useState(false);
   const [generateImages, setGenerateImages] = useState(false);
+
+  const steps: Step[] = [
+    {
+      target: '.tour-topic',
+      content: 'Digite o tema do seu quiz aqui. Pode ser qualquer coisa, desde "História do Brasil" até "Física Quântica"!',
+      disableBeacon: true,
+    },
+    {
+      target: '.tour-gamemode',
+      content: 'Escolha o modo de jogo. O modo Clássico é direto, o TV Show tem animações divertidas, e o modo Redação permite praticar escrita.',
+    },
+    {
+      target: '.tour-difficulty',
+      content: 'Ajuste a dificuldade das perguntas. Fácil para iniciantes, Médio para um desafio equilibrado, e Difícil para experts.',
+    },
+    {
+      target: '.tour-questions',
+      content: 'Defina quantas perguntas o quiz terá.',
+    },
+    {
+      target: '.tour-types',
+      content: 'Selecione os tipos de perguntas que deseja incluir: múltipla escolha, verdadeiro ou falso, associação, etc.',
+    },
+    {
+      target: '.tour-multiplayer',
+      content: 'Ative o modo multiplayer para jogar com amigos no mesmo dispositivo!',
+    },
+    {
+      target: '.tour-start',
+      content: 'Quando estiver pronto, clique aqui para gerar o seu quiz com Inteligência Artificial!',
+    }
+  ];
+
+  const handleJoyrideCallback = (data: CallBackProps) => {
+    const { status } = data;
+    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
+    if (finishedStatuses.includes(status)) {
+      setRunTutorial(false);
+    }
+  };
 
   const handleAddPlayer = () => {
       if (playerList.length < 4) {
@@ -128,6 +171,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
           teachingStyle,
           questionTypes: finalQuestionTypes,
           textualGenre: (finalQuestionTypes.includes('ESSAY') || gameMode === 'essay_challenge') ? textualGenre : undefined,
+          searchMedia,
           generateImages
       });
     }
@@ -146,8 +190,41 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="max-w-xl md:max-w-4xl mx-auto w-full transition-all duration-500"
+      className="max-w-xl md:max-w-4xl mx-auto w-full transition-all duration-500 relative"
     >
+      <Joyride
+        steps={steps}
+        run={runTutorial}
+        continuous={true}
+        showProgress={true}
+        showSkipButton={true}
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#4f46e5',
+            zIndex: 10000,
+          }
+        }}
+        locale={{
+          back: 'Anterior',
+          close: 'Fechar',
+          last: 'Finalizar',
+          next: 'Próximo',
+          skip: 'Pular'
+        }}
+      />
+
+      <div className="absolute -top-12 right-0 z-10">
+        <Button 
+          onClick={() => setRunTutorial(true)} 
+          variant="outline" 
+          className="bg-white/80 backdrop-blur-sm text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+          icon={<HelpCircle className="w-5 h-5" />}
+        >
+          Ver Tutorial
+        </Button>
+      </div>
+
       <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border border-slate-100">
         {/* Right Panel - Form */}
         <div className="p-6 md:p-10 bg-white">
@@ -180,7 +257,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
             </div>
 
             {/* Topic Input */}
-            <div className="space-y-3">
+            <div className="space-y-3 tour-topic">
               <label htmlFor="topic" className="block text-sm font-medium text-slate-700 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-indigo-500" />
                 Sobre o que você quer aprender?
@@ -233,7 +310,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Game Mode Selection */}
-                <div className="space-y-3 md:col-span-2">
+                <div className="space-y-3 md:col-span-2 tour-gamemode">
                     <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
                         <Gamepad2 className="w-4 h-4 text-indigo-500" />
                         Modo de Jogo
@@ -298,7 +375,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                 </div>
 
                 {/* Multiplayer Toggle */}
-                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 tour-multiplayer">
                     <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 transition-colors">
                         <div className={`w-10 h-6 rounded-full relative transition-colors ${isMultiplayer ? 'bg-indigo-600' : 'bg-slate-300'}`}>
                             <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${isMultiplayer ? 'translate-x-4' : 'translate-x-0'}`} />
@@ -381,7 +458,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
 
                 {/* Question Types (Only for non-Essay modes) */}
                 {gameMode !== 'essay_challenge' && (
-                    <div className="space-y-3 md:col-span-2">
+                    <div className="space-y-3 md:col-span-2 tour-types">
                         <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
                             <CheckSquare className="w-4 h-4 text-indigo-500" />
                             Tipos de Questões
@@ -413,10 +490,29 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                     </div>
                 )}
 
+                {/* Search Media Toggle */}
+                <div className="md:col-span-1">
+                    <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 transition-colors h-full">
+                        <div className={`w-10 h-6 rounded-full relative transition-colors shrink-0 ${searchMedia ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                            <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${searchMedia ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            className="hidden" 
+                            checked={searchMedia} 
+                            onChange={(e) => setSearchMedia(e.target.checked)} 
+                        />
+                        <div className="flex flex-col gap-1">
+                            <span className={`font-medium text-sm ${searchMedia ? 'text-indigo-900' : 'text-slate-600'}`}>Buscar Mídia na Internet</span>
+                            <span className="text-xs text-slate-500">Busca imagens e vídeos reais.</span>
+                        </div>
+                    </label>
+                </div>
+
                 {/* Generate Images Toggle */}
-                <div className="md:col-span-2">
-                    <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 transition-colors">
-                        <div className={`w-10 h-6 rounded-full relative transition-colors ${generateImages ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                <div className="md:col-span-1">
+                    <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 transition-colors h-full">
+                        <div className={`w-10 h-6 rounded-full relative transition-colors shrink-0 ${generateImages ? 'bg-indigo-600' : 'bg-slate-300'}`}>
                             <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${generateImages ? 'translate-x-4' : 'translate-x-0'}`} />
                         </div>
                         <input 
@@ -425,10 +521,9 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                             checked={generateImages} 
                             onChange={(e) => setGenerateImages(e.target.checked)} 
                         />
-                        <div className="flex items-center gap-2">
-                            <Palette className={`w-5 h-5 ${generateImages ? 'text-indigo-600' : 'text-slate-400'}`} />
-                            <span className={`font-medium ${generateImages ? 'text-indigo-900' : 'text-slate-600'}`}>Gerar Imagens para Enunciados</span>
-                            <Tooltip id="generateImages" text="A IA criará imagens ilustrativas para as perguntas (pode aumentar o tempo de geração)." />
+                        <div className="flex flex-col gap-1">
+                            <span className={`font-medium text-sm ${generateImages ? 'text-indigo-900' : 'text-slate-600'}`}>Gerar Imagens com IA</span>
+                            <span className="text-xs text-slate-500">Cria ilustrações para as perguntas.</span>
                         </div>
                     </label>
                 </div>
@@ -506,7 +601,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                     </div>
                     )
                 ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 tour-difficulty">
                         <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
                             <Layers className="w-4 h-4 text-indigo-500" />
                             Dificuldade
@@ -532,7 +627,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                 )}
 
                 {/* Question Count */}
-                <div className="space-y-3">
+                <div className="space-y-3 tour-questions">
                     <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
                         <BookOpen className="w-4 h-4 text-indigo-500" />
                         Questões
@@ -661,7 +756,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
               isLoading={isGenerating}
               disabled={!topic.trim()}
               icon={<Sparkles className="w-5 h-5" />}
-              className="mt-4 py-4 text-lg shadow-lg shadow-indigo-500/20"
+              className="mt-4 py-4 text-lg shadow-lg shadow-indigo-500/20 tour-start"
             >
               Gerar Quiz
             </Button>

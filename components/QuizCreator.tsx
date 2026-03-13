@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import { QuizData, Question, Difficulty, QuizTheme, GameMode, QuestionType } from '../types';
 import { Button } from './Button';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Save, ArrowLeft, CheckCircle2, ArrowRight, Image as ImageIcon, Video, Search, Sparkles, Loader2, X } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, CheckCircle2, ArrowRight, Image as ImageIcon, Video, Search, Sparkles, Loader2, X, HelpCircle, Link } from 'lucide-react';
 import { ImageSearchModal } from './ImageSearchModal';
 import { generateImage } from '../services/geminiService';
+import Joyride, { Step, CallBackProps, STATUS } from 'react-joyride';
+
+import { getYouTubeEmbedUrl } from '../utils/media';
 
 interface QuizCreatorProps {
   onSave: (quizData: QuizData) => void;
@@ -12,6 +15,7 @@ interface QuizCreatorProps {
 }
 
 export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) => {
+  const [runTutorial, setRunTutorial] = useState(false);
   const [title, setTitle] = useState('');
   const [topic, setTopic] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.Medium);
@@ -28,6 +32,46 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
       explanation: ''
     }
   ]);
+
+  const steps: Step[] = [
+    {
+      target: '.tour-metadata',
+      content: 'Comece dando um título e um tópico para o seu quiz. Você também pode escolher um tema visual!',
+      disableBeacon: true,
+    },
+    {
+      target: '.tour-question-type',
+      content: 'Escolha o tipo de pergunta: Múltipla Escolha, Verdadeiro/Falso, Preencher Lacunas, etc.',
+    },
+    {
+      target: '.tour-question-text',
+      content: 'Digite a pergunta aqui. Você também pode adicionar uma imagem para ilustrar!',
+    },
+    {
+      target: '.tour-options',
+      content: 'Preencha as opções de resposta e marque qual é a correta clicando no círculo ao lado dela.',
+    },
+    {
+      target: '.tour-explanation',
+      content: 'Adicione uma explicação que será mostrada após o jogador responder. Isso ajuda no aprendizado!',
+    },
+    {
+      target: '.tour-add-question',
+      content: 'Clique aqui para adicionar mais perguntas ao seu quiz.',
+    },
+    {
+      target: '.tour-save',
+      content: 'Quando terminar, salve e jogue seu quiz recém-criado!',
+    }
+  ];
+
+  const handleJoyrideCallback = (data: CallBackProps) => {
+    const { status } = data;
+    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
+    if (finishedStatuses.includes(status)) {
+      setRunTutorial(false);
+    }
+  };
 
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [searchTarget, setSearchTarget] = useState<{
@@ -338,7 +382,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
         </div>
         <Button 
           onClick={handleSave} 
-          className="bg-white text-black hover:bg-indigo-50 border-indigo-600 shadow-none"
+          className="bg-white text-black hover:bg-indigo-50 border-indigo-600 shadow-none tour-save"
           icon={<Save className="w-5 h-5" />}
         >
           Salvar e Jogar
@@ -347,7 +391,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
 
       <div className="p-8 space-y-8">
         {/* Metadata Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 tour-metadata">
           <div className="space-y-2">
             <label className="block text-sm font-medium text-slate-700">Título do Quiz</label>
             <input
@@ -424,7 +468,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                             <select
                                 value={q.type}
                                 onChange={(e) => handleTypeChange(qIndex, e.target.value as QuestionType)}
-                                className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none tour-question-type"
                             >
                                 <option value="MULTIPLE_CHOICE">Múltipla Escolha</option>
                                 <option value="TRUE_FALSE">Verdadeiro ou Falso</option>
@@ -456,7 +500,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                   value={q.text}
                                   onChange={(e) => handleQuestionChange(qIndex, 'text', e.target.value)}
                                   placeholder={q.type === 'ESSAY' ? "Digite o tema da redação ou enunciado..." : (q.type === 'FILL_IN_THE_BLANK' ? "Digite a frase com a lacuna (Ex: O céu é ___)" : "Digite a pergunta aqui...")}
-                                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium"
+                                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium tour-question-text"
                                 />
                                 <div className="flex gap-2 items-center">
                                     {q.image || q.video ? (
@@ -473,9 +517,17 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                 </div>
                                             )}
                                             {q.video && (
-                                                <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 group/video">
-                                                    <video src={q.video} className="w-full h-full object-cover" />
-                                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                                <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 group/video bg-black">
+                                                    {getYouTubeEmbedUrl(q.video) ? (
+                                                        <iframe 
+                                                            src={getYouTubeEmbedUrl(q.video)!} 
+                                                            className="w-full h-full object-cover pointer-events-none"
+                                                            allowFullScreen
+                                                        />
+                                                    ) : (
+                                                        <video src={q.video} className="w-full h-full object-cover" />
+                                                    )}
+                                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
                                                         <Video className="w-8 h-8 text-white opacity-50" />
                                                     </div>
                                                     <button 
@@ -543,6 +595,18 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                     }}
                                                 />
                                             </label>
+                                            <button
+                                                onClick={() => {
+                                                    const url = window.prompt("Cole o link do vídeo (YouTube, Vimeo, etc):");
+                                                    if (url) {
+                                                        handleQuestionChange(qIndex, 'video', url);
+                                                    }
+                                                }}
+                                                className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200 font-medium"
+                                            >
+                                                <Link className="w-4 h-4" />
+                                                Link de Vídeo
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -551,7 +615,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                         
                         {/* MULTIPLE CHOICE */}
                         {q.type === 'MULTIPLE_CHOICE' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 tour-options">
                               {q.options?.map((opt, oIndex) => (
                                 <div key={oIndex} className="flex flex-col gap-2">
                                     <div className="flex items-center gap-3">
@@ -627,7 +691,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
 
                         {/* TRUE / FALSE */}
                         {q.type === 'TRUE_FALSE' && (
-                            <div className="flex gap-4 p-2">
+                            <div className="flex gap-4 p-2 tour-options">
                                 {['Verdadeiro', 'Falso'].map((opt, oIndex) => (
                                     <label key={oIndex} className={`flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer transition-all ${q.correctAnswerIndex === oIndex ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 text-slate-600'}`}>
                                         <input 
@@ -645,7 +709,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
 
                         {/* FILL IN THE BLANK */}
                         {q.type === 'FILL_IN_THE_BLANK' && (
-                            <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+                            <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 tour-options">
                                 <label className="block text-xs font-bold text-indigo-900 mb-2 uppercase tracking-wider">Resposta Correta</label>
                                 <input 
                                     type="text"
@@ -662,7 +726,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
 
                         {/* MATCHING */}
                         {q.type === 'MATCHING' && (
-                            <div className="space-y-3 bg-slate-100/50 p-4 rounded-2xl border border-slate-200">
+                            <div className="space-y-3 bg-slate-100/50 p-4 rounded-2xl border border-slate-200 tour-options">
                                 <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Pares (Item → Correspondência)</label>
                                 <div className="space-y-4">
                                     {q.pairs?.map((pair, pIndex) => (
@@ -828,7 +892,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                             </div>
                         )}
 
-                        <div>
+                        <div className="tour-explanation">
                           <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">
                               {q.type === 'ESSAY' ? "Rubrica / Critérios de Avaliação (Opcional)" : "Explicação (Opcional)"}
                           </label>
@@ -851,7 +915,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
             <Button 
               onClick={handleAddQuestion}
               variant="outline"
-              className="border-dashed border-2 border-slate-300 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50"
+              className="border-dashed border-2 border-slate-300 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 tour-add-question"
               icon={<Plus className="w-5 h-5" />}
             >
               Adicionar Pergunta

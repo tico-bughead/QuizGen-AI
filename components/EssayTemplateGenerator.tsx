@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Button } from './Button';
-import { PenTool, Download, Sparkles, FileText, ArrowLeft, Loader2 } from 'lucide-react';
+import { PenTool, Download, Sparkles, FileText, ArrowLeft, Loader2, HelpCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import { generateEssayModel, generateEssayTopic } from '../services/geminiService';
 import { getDraftStructureForGenre } from '../utils/genreStructures';
+import Joyride, { CallBackProps, STATUS, Step } from 'react-joyride';
 
 interface EssayTemplateGeneratorProps {
   onBack: () => void;
@@ -17,6 +18,36 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
   const [isLoadingModel, setIsLoadingModel] = useState(false);
   const [generatedModel, setGeneratedModel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [runTutorial, setRunTutorial] = useState(false);
+
+  const steps: Step[] = [
+    {
+      target: '.tour-topic',
+      content: 'Digite o tema da redação aqui. Se estiver sem ideias, clique no botão ao lado para gerar um tema com IA!',
+      disableBeacon: true,
+    },
+    {
+      target: '.tour-genre',
+      content: 'Escolha o gênero textual da sua redação. O padrão é Dissertativo-argumentativo (estilo ENEM).',
+    },
+    {
+      target: '.tour-generate-model',
+      content: 'Clique aqui para gerar uma redação modelo nota 1000 baseada no tema e gênero escolhidos.',
+    },
+    {
+      target: '.tour-download-draft',
+      content: 'Baixe uma folha de rascunho em PDF com a estrutura ideal para o gênero escolhido, pronta para imprimir e praticar!',
+    }
+  ];
+
+  const handleJoyrideCallback = (data: CallBackProps) => {
+    const { status } = data;
+    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
+
+    if (finishedStatuses.includes(status)) {
+      setRunTutorial(false);
+    }
+  };
 
   const handleGenerateTopic = async () => {
     setIsLoadingTopic(true);
@@ -198,23 +229,54 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
   };
 
   return (
+    <>
+      <Joyride
+        steps={steps}
+        run={runTutorial}
+        continuous={true}
+        showProgress={true}
+        showSkipButton={true}
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#4f46e5',
+            zIndex: 10000,
+          },
+        }}
+        locale={{
+          back: 'Voltar',
+          close: 'Fechar',
+          last: 'Concluir',
+          next: 'Próximo',
+          skip: 'Pular',
+        }}
+      />
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className="max-w-2xl mx-auto w-full bg-white rounded-[2.5rem] shadow-xl overflow-hidden border border-slate-100"
     >
       <div className="p-8 md:p-10">
-        <div className="flex items-center gap-4 mb-8">
-            <button 
-                onClick={onBack}
-                className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500"
+        <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+                <button 
+                    onClick={onBack}
+                    className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500"
+                >
+                    <ArrowLeft className="w-6 h-6" />
+                </button>
+                <h2 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">
+                    <PenTool className="w-8 h-8 text-indigo-600" />
+                    Gerador de Redação
+                </h2>
+            </div>
+            <button
+              onClick={() => setRunTutorial(true)}
+              className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-full transition-colors"
             >
-                <ArrowLeft className="w-6 h-6" />
+              <HelpCircle className="w-4 h-4" />
+              Ver Tutorial
             </button>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">
-                <PenTool className="w-8 h-8 text-indigo-600" />
-                Gerador de Redação
-            </h2>
         </div>
 
         <div className="space-y-6">
@@ -225,7 +287,7 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
                     value={textualGenre}
                     onChange={(e) => setTextualGenre(e.target.value)}
                     placeholder="Ex: Dissertativo-argumentativo, Artigo de Opinião..."
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all tour-genre"
                 />
             </div>
 
@@ -233,7 +295,7 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
                 <label className="block text-sm font-medium text-slate-700">
                     {textualGenre.toLowerCase().includes('dissertativo-argumentativo') ? 'Tema da Redação' : 'Título'}
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 tour-topic">
                     <input 
                         type="text" 
                         value={topic}
@@ -278,7 +340,7 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
                     onClick={handleDownloadDraft}
                     disabled={!topic.trim()}
                     variant="outline"
-                    className="h-auto py-4 flex flex-col items-center gap-2 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 group"
+                    className="h-auto py-4 flex flex-col items-center gap-2 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 group tour-download-draft"
                 >
                     <PenTool className="w-8 h-8 text-slate-400 group-hover:text-indigo-500 transition-colors" />
                     <span className="font-medium text-slate-700 group-hover:text-indigo-700">Baixar Rascunhão</span>
@@ -289,7 +351,7 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
                     onClick={handleGenerateModel}
                     disabled={!topic.trim() || isLoadingModel}
                     isLoading={isLoadingModel}
-                    className="h-auto py-4 flex flex-col items-center gap-2 bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 group relative overflow-hidden sm:col-span-2"
+                    className="h-auto py-4 flex flex-col items-center gap-2 bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 group relative overflow-hidden sm:col-span-2 tour-generate-model"
                 >
                     <Sparkles className="w-8 h-8 text-indigo-200 group-hover:text-white transition-colors relative z-10" />
                     <span className="font-medium text-white relative z-10">Gerar Modelo Nota 1000</span>
@@ -328,5 +390,6 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
         </div>
       </div>
     </motion.div>
+    </>
   );
 };

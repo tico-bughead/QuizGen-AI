@@ -256,7 +256,9 @@ export const generateQuiz = async (
     Diretrizes Gerais:
     - Certifique-se de que as perguntas sejam claras, as opções sejam plausíveis e a explicação seja útil.
     - O título do quiz deve ser criativo e relacionado ao tópico.
-    ${config.generateImages ? "- Utilize 'questionImage: true' para gerar imagens ilustrativas para o enunciado das perguntas sempre que possível.\n    - Utilize 'optionImages' (array de booleanos) para gerar imagens para as alternativas de Múltipla Escolha, se fizer sentido visualmente.\n    - Para perguntas de Relacionar Colunas (MATCHING), você pode definir 'leftImage: true' ou 'rightImage: true' nos pares para gerar imagens correspondentes." : "- NÃO gere imagens para as perguntas, opções ou pares (defina questionImage, optionImages, leftImage e rightImage como false)."}
+    ${config.searchMedia ? "- Busque e inclua URLs reais de imagens (ex: Unsplash, Wikimedia) no campo 'image' e URLs de vídeos (ex: YouTube) no campo 'video' para ilustrar os enunciados das perguntas sempre que fizer sentido." : ""}
+    ${config.generateImages ? "- Se você não encontrar uma URL real ou se preferir uma imagem gerada por IA, defina o campo 'image' com o valor exato '[GENERATE]'. Você também pode usar '[GENERATE]' nos arrays 'optionImages' ou nos campos 'leftImage' e 'rightImage' dos pares." : ""}
+    ${!config.searchMedia && !config.generateImages ? "- NÃO inclua imagens ou vídeos nas perguntas (deixe os campos 'image', 'video', 'optionImages', 'leftImage' e 'rightImage' vazios)." : ""}
   `;
 
   const responseSchema = {
@@ -271,9 +273,10 @@ export const generateQuiz = async (
             id: { type: "integer" },
             type: { type: "string", enum: ["MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING", "FILL_IN_THE_BLANK", "ESSAY"] },
             text: { type: "string" },
-            questionImage: { type: "boolean" },
+            image: { type: "string" },
+            video: { type: "string" },
             options: { type: "array", items: { type: "string" } },
-            optionImages: { type: "array", items: { type: "boolean" } },
+            optionImages: { type: "array", items: { type: "string" } },
             correctAnswerIndex: { type: "integer" },
             explanation: { type: "string" },
             essayRubric: { type: "string" },
@@ -284,8 +287,8 @@ export const generateQuiz = async (
                 properties: {
                   left: { type: "string" },
                   right: { type: "string" },
-                  leftImage: { type: "boolean" },
-                  rightImage: { type: "boolean" }
+                  leftImage: { type: "string" },
+                  rightImage: { type: "string" }
                 }
               }
             }
@@ -308,53 +311,55 @@ export const generateQuiz = async (
           throw new Error("O quiz gerado não contém perguntas válidas.");
       }
 
-      // Post-process to generate images for questions
+      // Post-process to ensure empty strings are converted to undefined and handle [GENERATE]
       await Promise.all(data.questions.map(async (q: any) => {
-          // Question Image
-          if (q.questionImage) {
+          if (!q.image) q.image = undefined;
+          if (!q.video) q.video = undefined;
+          
+          if (q.image === '[GENERATE]') {
               try {
                   q.image = await generateImage(q.text, "512px");
               } catch (e) {
                   console.error("Failed to generate question image", e);
+                  q.image = undefined;
               }
           }
-
+          
           if (q.type === 'MULTIPLE_CHOICE' && q.optionImages) {
-              q.optionImages = await Promise.all(q.optionImages.map(async (shouldGen: boolean, idx: number) => {
-                  if (shouldGen && q.options[idx]) {
+              q.optionImages = await Promise.all(q.optionImages.map(async (img: string, idx: number) => {
+                  if (img === '[GENERATE]' && q.options[idx]) {
                       try {
                           return await generateImage(q.options[idx], "512px");
                       } catch (e) {
                           console.error("Failed to generate option image", e);
-                          return null;
+                          return undefined;
                       }
                   }
-                  return null;
+                  return img || undefined;
               }));
           }
 
           if (q.type === 'MATCHING' && q.pairs) {
               await Promise.all(q.pairs.map(async (pair: any) => {
-                  if (pair.leftImage) {
+                  if (!pair.leftImage) pair.leftImage = undefined;
+                  if (!pair.rightImage) pair.rightImage = undefined;
+
+                  if (pair.leftImage === '[GENERATE]') {
                       try {
                           pair.leftImage = await generateImage(pair.left, "512px");
                       } catch (e) {
                           console.error("Failed to generate left pair image", e);
                           pair.leftImage = undefined;
                       }
-                  } else {
-                      pair.leftImage = undefined;
                   }
                   
-                  if (pair.rightImage) {
+                  if (pair.rightImage === '[GENERATE]') {
                       try {
                           pair.rightImage = await generateImage(pair.right, "512px");
                       } catch (e) {
                           console.error("Failed to generate right pair image", e);
                           pair.rightImage = undefined;
                       }
-                  } else {
-                      pair.rightImage = undefined;
                   }
               }));
           }
