@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Difficulty, QuizConfig, QuizTheme, GameMode, ArcadeMap, TeachingStyle, QuestionType } from '../types';
 import { Button } from './Button';
-import { BrainCircuit, Sparkles, BookOpen, Layers, Tv, Palette, Sun, Moon, Zap, Gamepad2, Trophy, Leaf, Snowflake, Flower2, Map, Mountain, Skull, Trees, Info, GraduationCap, PenTool, CheckSquare, HelpCircle } from 'lucide-react';
+import { BrainCircuit, Sparkles, BookOpen, Layers, Tv, Palette, Sun, Moon, Zap, Gamepad2, Trophy, Leaf, Snowflake, Flower2, Map, Mountain, Skull, Trees, Info, GraduationCap, PenTool, CheckSquare, HelpCircle, Shuffle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Joyride, { Step, CallBackProps, STATUS } from 'react-joyride';
 
@@ -662,7 +662,7 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                             Tema
                             <Tooltip id="theme" text="Mude as cores e o clima de toda a interface." />
                         </label>
-                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-9 gap-2 px-2 md:px-4">
+                        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-10 gap-2 px-2 md:px-4">
                              <button
                                 type="button"
                                 onClick={() => setTheme('light')}
@@ -734,6 +734,14 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
                                  title="Primavera"
                              >
                                 <Flower2 className="w-5 h-5" />
+                             </button>
+                             <button
+                                type="button"
+                                onClick={() => setTheme('random')}
+                                className={`aspect-square rounded-[2rem] border flex flex-col items-center justify-center gap-1 transition-all ${theme === 'random' ? 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 border-transparent text-white ring-2 ring-offset-1 ring-purple-500' : 'bg-white border-slate-200 text-slate-400'}`}
+                                 title="Aleatório"
+                             >
+                                <Shuffle className="w-5 h-5" />
                              </button>
                         </div>
                         <div className="text-center md:px-10">

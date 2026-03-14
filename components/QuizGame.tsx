@@ -39,6 +39,7 @@ const THEME_MUSIC: Record<QuizTheme, string> = {
   autumn: "https://actions.google.com/sounds/v1/weather/wind_through_trees.ogg",
   winter: "https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg",
   spring: "https://actions.google.com/sounds/v1/ambiences/morning_farm_ambience.ogg",
+  random: "https://actions.google.com/sounds/v1/ambiences/outdoor_garden.ogg" // Fallback
 };
 
 import { generateSpeech, evaluateEssay } from '../services/geminiService';
@@ -148,6 +149,8 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
+  const AVAILABLE_THEMES: QuizTheme[] = ['light', 'dark', 'vibrant', 'retro', 'neon', 'summer', 'autumn', 'winter', 'spring'];
+
   // Determine effective theme based on Arcade Map if applicable
   const getEffectiveTheme = (): QuizTheme => {
       if (quiz.gameMode === 'arcade' && quiz.arcadeMap) {
@@ -156,9 +159,16 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
               case 'underground': return 'dark';
               case 'athletic': return 'vibrant';
               case 'boss': return 'autumn'; // Or maybe 'retro' for 8-bit feel? 'autumn' has red tones.
-              default: return quiz.theme;
+              default: break;
           }
       }
+      
+      if (quiz.theme === 'random') {
+          // Use a simple hash of the question text to pick a stable theme for this question
+          const hash = question.text.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+          return AVAILABLE_THEMES[hash % AVAILABLE_THEMES.length];
+      }
+      
       return quiz.theme;
   };
 
@@ -1078,40 +1088,40 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
             <div className="w-full mb-6 px-1">
           <div className={`flex justify-between text-xs font-bold mb-2 uppercase tracking-wider ${
             quiz.isTvMode ? 'text-yellow-400/80' : 
-            (quiz.theme === 'dark' ? 'text-slate-400' : 
-            (quiz.theme === 'vibrant' ? 'text-white/80' : 
-            (quiz.theme === 'neon' ? 'text-cyan-400/80' : 
-            (quiz.theme === 'retro' ? 'text-amber-900/60' : 
-            (quiz.theme === 'summer' ? 'text-orange-600/80' : 
-            (quiz.theme === 'autumn' ? 'text-red-800/70' : 
-            (quiz.theme === 'winter' ? 'text-sky-700/80' : 
-            (quiz.theme === 'spring' ? 'text-pink-600/80' : 'text-slate-500'))))))))
+            (effectiveTheme === 'dark' ? 'text-slate-400' : 
+            (effectiveTheme === 'vibrant' ? 'text-white/80' : 
+            (effectiveTheme === 'neon' ? 'text-cyan-400/80' : 
+            (effectiveTheme === 'retro' ? 'text-amber-900/60' : 
+            (effectiveTheme === 'summer' ? 'text-orange-600/80' : 
+            (effectiveTheme === 'autumn' ? 'text-red-800/70' : 
+            (effectiveTheme === 'winter' ? 'text-sky-700/80' : 
+            (effectiveTheme === 'spring' ? 'text-pink-600/80' : 'text-slate-500'))))))))
           }`}>
             <span>Progresso do Quiz</span>
             <span>{currentQuestionIndex + 1} de {totalQuestions}</span>
           </div>
           <div className={`w-full h-3 rounded-full overflow-hidden ${
             quiz.isTvMode ? 'bg-black/60 border border-white/10' : 
-            (quiz.theme === 'dark' ? 'bg-slate-800' : 
-            (quiz.theme === 'vibrant' ? 'bg-black/20' : 
-            (quiz.theme === 'neon' ? 'bg-gray-900 border border-cyan-900' : 
-            (quiz.theme === 'retro' ? 'bg-amber-200/50 border border-amber-900/10' : 
-            (quiz.theme === 'summer' ? 'bg-orange-200/50' : 
-            (quiz.theme === 'autumn' ? 'bg-orange-200/50' : 
-            (quiz.theme === 'winter' ? 'bg-sky-200/50' : 
-            (quiz.theme === 'spring' ? 'bg-green-200/50' : 'bg-slate-200'))))))))
+            (effectiveTheme === 'dark' ? 'bg-slate-800' : 
+            (effectiveTheme === 'vibrant' ? 'bg-black/20' : 
+            (effectiveTheme === 'neon' ? 'bg-gray-900 border border-cyan-900' : 
+            (effectiveTheme === 'retro' ? 'bg-amber-200/50 border border-amber-900/10' : 
+            (effectiveTheme === 'summer' ? 'bg-orange-200/50' : 
+            (effectiveTheme === 'autumn' ? 'bg-orange-200/50' : 
+            (effectiveTheme === 'winter' ? 'bg-sky-200/50' : 
+            (effectiveTheme === 'spring' ? 'bg-green-200/50' : 'bg-slate-200'))))))))
           }`}>
             <div 
               className={`h-full transition-all duration-700 ease-out rounded-full ${
                 quiz.isTvMode 
                   ? 'bg-gradient-to-r from-yellow-500 to-amber-600 shadow-[0_0_10px_rgba(245,158,11,0.5)]' 
-                  : (quiz.theme === 'vibrant' ? 'bg-white shadow-sm' : 
-                    (quiz.theme === 'neon' ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]' : 
-                    (quiz.theme === 'retro' ? 'bg-amber-600' : 
-                    (quiz.theme === 'summer' ? 'bg-orange-500' : 
-                    (quiz.theme === 'autumn' ? 'bg-red-700' : 
-                    (quiz.theme === 'winter' ? 'bg-sky-600' : 
-                    (quiz.theme === 'spring' ? 'bg-pink-500' : 'bg-indigo-600')))))))
+                  : (effectiveTheme === 'vibrant' ? 'bg-white shadow-sm' : 
+                    (effectiveTheme === 'neon' ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]' : 
+                    (effectiveTheme === 'retro' ? 'bg-amber-600' : 
+                    (effectiveTheme === 'summer' ? 'bg-orange-500' : 
+                    (effectiveTheme === 'autumn' ? 'bg-red-700' : 
+                    (effectiveTheme === 'winter' ? 'bg-sky-600' : 
+                    (effectiveTheme === 'spring' ? 'bg-pink-500' : 'bg-indigo-600')))))))
               }`}
               style={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }}
             />
@@ -1617,7 +1627,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                         )}
                     </div>
                     <div className="min-w-0">
-                        <h4 className={`font-bold text-base sm:text-lg mb-1 ${quiz.isTvMode ? 'text-white' : (quiz.theme === 'light' ? 'text-slate-800' : 'text-white')}`}>
+                        <h4 className={`font-bold text-base sm:text-lg mb-1 ${quiz.isTvMode ? 'text-white' : (effectiveTheme === 'light' ? 'text-slate-800' : 'text-white')}`}>
                             {isSkipped 
                                 ? "Questão Pulada" 
                                 : (isTimeUp && selectedOption === null ? "Tempo Esgotado!" : (isCorrect ? "Correto!" : "Incorreto!"))}
@@ -1651,14 +1661,14 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                     onClick={handleConfirm}
                     disabled={(!isAnswerChecked && (question.type === 'FILL_IN_THE_BLANK' ? fillInBlankAnswer.trim() === '' : question.type === 'ESSAY' ? essayAnswer.trim() === '' : selectedOption === null)) || isTransitioning || isEvaluating}
                     icon={isAnswerChecked && isLastQuestion ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6"/> : isEvaluating ? <Loader2 className="w-5 h-5 animate-spin" /> : undefined}
-                    variant={quiz.isTvMode || quiz.theme === 'vibrant' ? 'outline' : "primary"}
+                    variant={quiz.isTvMode || effectiveTheme === 'vibrant' ? 'outline' : "primary"}
                     className={quiz.isTvMode ? 'text-lg sm:text-xl py-3 sm:py-4 px-6 sm:px-8 font-bold border-2 w-full sm:w-auto' : 'w-full sm:w-auto'}
                     style={quiz.isTvMode ? { 
                         color: '#FEF08A', 
                         borderColor: '#FEF08A', 
                         backgroundColor: 'rgba(0,0,0,0.4)', 
                         boxShadow: '0 0 15px rgba(254, 240, 138, 0.2)'
-                    } : (quiz.theme === 'vibrant' ? { color: 'white', borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.2)' } : {})}
+                    } : (effectiveTheme === 'vibrant' ? { color: 'white', borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.2)' } : {})}
                     >
                     {!isAnswerChecked ? (
                         <span className="flex items-center justify-center">
@@ -1677,14 +1687,14 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                      <Button
                      onClick={handleNextQuestion}
                      disabled={isTransitioning}
-                     variant={quiz.isTvMode || quiz.theme === 'vibrant' ? 'outline' : "primary"}
+                     variant={quiz.isTvMode || effectiveTheme === 'vibrant' ? 'outline' : "primary"}
                      className={quiz.isTvMode ? 'text-lg sm:text-xl py-3 sm:py-4 px-6 sm:px-8 font-bold border-2 w-full sm:w-auto' : 'w-full sm:w-auto'}
                      style={quiz.isTvMode ? { 
                          color: '#FEF08A', 
                          borderColor: '#FEF08A', 
                          backgroundColor: 'rgba(0,0,0,0.4)', 
                          boxShadow: '0 0 15px rgba(254, 240, 138, 0.2)'
-                     } : (quiz.theme === 'vibrant' ? { color: 'white', borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.2)' } : {})}
+                     } : (effectiveTheme === 'vibrant' ? { color: 'white', borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.2)' } : {})}
                      >
                          <span className="flex items-center justify-center">
                          {isLastQuestion ? 'Ver Resultados' : 'Próxima Questão'} <ChevronRight className={`ml-1 ${quiz.isTvMode ? 'w-5 h-5 sm:w-6 sm:h-6' : 'w-4 h-4'}`} />

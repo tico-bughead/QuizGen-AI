@@ -428,6 +428,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                 <option value="autumn">Outono</option>
                 <option value="winter">Inverno</option>
                 <option value="spring">Primavera</option>
+                <option value="random">Aleatório</option>
             </select>
           </div>
         </div>
