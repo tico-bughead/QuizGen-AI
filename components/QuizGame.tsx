@@ -44,6 +44,7 @@ const THEME_MUSIC: Record<QuizTheme, string> = {
 
 import { generateSpeech, evaluateEssay } from '../services/geminiService';
 import { getDraftStructureForGenre } from '../utils/genreStructures';
+import { PromptModal } from './PromptModal';
 
 interface EssayDraft {
   introProblemX: string;
@@ -117,6 +118,18 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
   const [isTransitioning, setIsTransitioning] = useState(false); // Estado para animação entre perguntas
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   
+  const [promptModal, setPromptModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    defaultValue: string;
+    onConfirm: (val: string) => void;
+  }>({
+    isOpen: false,
+    title: '',
+    defaultValue: '',
+    onConfirm: () => {},
+  });
+
   // Estado para as cortinas do Modo TV
   // Se for TV, começa fechada (false) para abrir. Se não for TV, começa aberta (true).
   const [areCurtainsOpen, setAreCurtainsOpen] = useState(!quiz.isTvMode);
@@ -1310,8 +1323,15 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                                     y += 8;
                                 }
                                 
-                                const fileName = window.prompt("Digite o nome do arquivo:", "folha_redacao") || "folha_redacao";
-                                doc.save(`${fileName}.pdf`);
+                                setPromptModal({
+                                    isOpen: true,
+                                    title: "Nome do Arquivo",
+                                    defaultValue: "folha_redacao",
+                                    onConfirm: (fileName) => {
+                                        doc.save(`${fileName || "folha_redacao"}.pdf`);
+                                        setPromptModal(prev => ({ ...prev, isOpen: false }));
+                                    }
+                                });
                             }}
                             icon={<Download className="w-3 h-3" />}
                             className="text-xs py-1 h-8 mb-2"
@@ -1705,6 +1725,13 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
           </div>
         </div>
       </div>
+      <PromptModal
+        isOpen={promptModal.isOpen}
+        title={promptModal.title}
+        defaultValue={promptModal.defaultValue}
+        onConfirm={promptModal.onConfirm}
+        onCancel={() => setPromptModal(prev => ({ ...prev, isOpen: false }))}
+      />
       <style>{`
         @keyframes feedback-enter {
           0% { opacity: 0; transform: scale(0.9) translateY(20px); }

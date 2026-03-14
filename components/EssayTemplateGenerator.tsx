@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf';
 import { generateEssayModel, generateEssayTopic } from '../services/geminiService';
 import { getDraftStructureForGenre } from '../utils/genreStructures';
 import Joyride, { CallBackProps, STATUS, Step } from 'react-joyride';
+import { PromptModal } from './PromptModal';
 
 interface EssayTemplateGeneratorProps {
   onBack: () => void;
@@ -48,6 +49,18 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
       setRunTutorial(false);
     }
   };
+
+  const [promptModal, setPromptModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    defaultValue: string;
+    onConfirm: (val: string) => void;
+  }>({
+    isOpen: false,
+    title: '',
+    defaultValue: '',
+    onConfirm: () => {},
+  });
 
   const handleGenerateTopic = async () => {
     setIsLoadingTopic(true);
@@ -96,8 +109,15 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
         y += 8;
     }
     
-    const fileName = window.prompt("Digite o nome do arquivo:", "folha_redacao") || "folha_redacao";
-    doc.save(`${fileName}.pdf`);
+    setPromptModal({
+      isOpen: true,
+      title: "Nome do Arquivo",
+      defaultValue: "folha_redacao",
+      onConfirm: (fileName) => {
+        doc.save(`${fileName || "folha_redacao"}.pdf`);
+        setPromptModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const handleDownloadDraft = () => {
@@ -202,8 +222,15 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
         });
     }
 
-    const fileName = window.prompt("Digite o nome do arquivo:", "rascunhao_redacao") || "rascunhao_redacao";
-    doc.save(`${fileName}.pdf`);
+    setPromptModal({
+      isOpen: true,
+      title: "Nome do Arquivo",
+      defaultValue: "rascunhao_redacao",
+      onConfirm: (fileName) => {
+        doc.save(`${fileName || "rascunhao_redacao"}.pdf`);
+        setPromptModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const handleDownloadModel = () => {
@@ -224,8 +251,15 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
     const splitText = doc.splitTextToSize(generatedModel, pageWidth - 40);
     doc.text(splitText, 20, 50);
     
-    const fileName = window.prompt("Digite o nome do arquivo:", "redacao_modelo") || "redacao_modelo";
-    doc.save(`${fileName}.pdf`);
+    setPromptModal({
+      isOpen: true,
+      title: "Nome do Arquivo",
+      defaultValue: "redacao_modelo",
+      onConfirm: (fileName) => {
+        doc.save(`${fileName || "redacao_modelo"}.pdf`);
+        setPromptModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   return (
@@ -390,6 +424,14 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
         </div>
       </div>
     </motion.div>
+
+    <PromptModal
+      isOpen={promptModal.isOpen}
+      title={promptModal.title}
+      defaultValue={promptModal.defaultValue}
+      onConfirm={promptModal.onConfirm}
+      onCancel={() => setPromptModal(prev => ({ ...prev, isOpen: false }))}
+    />
     </>
   );
 };

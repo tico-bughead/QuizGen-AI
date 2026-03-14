@@ -4,6 +4,8 @@ import { Button } from './Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Save, ArrowLeft, CheckCircle2, ArrowRight, Image as ImageIcon, Video, Search, Sparkles, Loader2, X, HelpCircle, Link } from 'lucide-react';
 import { ImageSearchModal } from './ImageSearchModal';
+import { PromptModal } from './PromptModal';
+import { AlertModal } from './AlertModal';
 import { generateImage } from '../services/geminiService';
 import Joyride, { Step, CallBackProps, STATUS } from 'react-joyride';
 
@@ -90,6 +92,30 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
     side?: 'left' | 'right';
   } | null>(null);
   const [generatePrompt, setGeneratePrompt] = useState('');
+
+  const [promptModal, setPromptModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    placeholder: string;
+    onConfirm: (val: string) => void;
+  }>({
+    isOpen: false,
+    title: '',
+    placeholder: '',
+    onConfirm: () => {},
+  });
+
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    message: string;
+  }>({
+    isOpen: false,
+    message: '',
+  });
+
+  const showAlert = (message: string) => {
+    setAlertModal({ isOpen: true, message });
+  };
 
   const handleImageSelect = (imageUrl: string) => {
     if (!searchTarget) return;
@@ -202,11 +228,11 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
               }
               setQuestions(newQuestions);
           } else {
-              alert("Não foi possível gerar a imagem. Verifique se a chave QUIZ_GEN_IMAGES está configurada.");
+              showAlert("Não foi possível gerar a imagem. Verifique se a chave QUIZ_GEN_IMAGES está configurada.");
           }
       } catch (error) {
           console.error("Erro ao gerar imagem:", error);
-          alert("Erro ao gerar imagem. Verifique o console para mais detalhes.");
+          showAlert("Erro ao gerar imagem. Verifique o console para mais detalhes.");
       } finally {
           setIsGeneratingImage(null);
           setGenerateTarget(null);
@@ -321,33 +347,33 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
   const handleSave = () => {
     // Basic validation
     if (!title.trim() || !topic.trim()) {
-      alert("Por favor, preencha o título e o tópico do quiz.");
+      showAlert("Por favor, preencha o título e o tópico do quiz.");
       return;
     }
 
     for (const q of questions) {
       if (!q.text.trim()) {
-        alert(`A pergunta ${q.id} deve ter um enunciado.`);
+        showAlert(`A pergunta ${q.id} deve ter um enunciado.`);
         return;
       }
 
       if (q.type === 'MULTIPLE_CHOICE') {
           if (q.options?.some(opt => !opt.trim())) {
-            alert(`Todas as opções da pergunta ${q.id} devem ser preenchidas.`);
+            showAlert(`Todas as opções da pergunta ${q.id} devem ser preenchidas.`);
             return;
           }
       } else if (q.type === 'FILL_IN_THE_BLANK') {
           if (!q.options?.[0]?.trim()) {
-              alert(`A resposta correta da pergunta ${q.id} deve ser preenchida.`);
+              showAlert(`A resposta correta da pergunta ${q.id} deve ser preenchida.`);
               return;
           }
       } else if (q.type === 'MATCHING') {
           if (q.pairs?.some(p => !p.left.trim() || !p.right.trim())) {
-              alert(`Todos os pares da pergunta ${q.id} devem ser preenchidos.`);
+              showAlert(`Todos os pares da pergunta ${q.id} devem ser preenchidos.`);
               return;
           }
           if ((q.pairs?.length || 0) < 2) {
-              alert(`A pergunta ${q.id} deve ter pelo menos 2 pares.`);
+              showAlert(`A pergunta ${q.id} deve ter pelo menos 2 pares.`);
               return;
           }
       }
@@ -598,10 +624,17 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                             </label>
                                             <button
                                                 onClick={() => {
-                                                    const url = window.prompt("Cole o link do vídeo (Ex: YouTube, Shorts, MP4):");
-                                                    if (url) {
-                                                        handleQuestionChange(qIndex, 'video', url);
-                                                    }
+                                                    setPromptModal({
+                                                        isOpen: true,
+                                                        title: "Link do Vídeo",
+                                                        placeholder: "Cole o link do vídeo (Ex: YouTube, Shorts, MP4)",
+                                                        onConfirm: (url) => {
+                                                            if (url) {
+                                                                handleQuestionChange(qIndex, 'video', url);
+                                                            }
+                                                            setPromptModal(prev => ({ ...prev, isOpen: false }));
+                                                        }
+                                                    });
                                                 }}
                                                 className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200 font-medium"
                                             >
@@ -991,6 +1024,20 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <PromptModal
+        isOpen={promptModal.isOpen}
+        title={promptModal.title}
+        placeholder={promptModal.placeholder}
+        onConfirm={promptModal.onConfirm}
+        onCancel={() => setPromptModal(prev => ({ ...prev, isOpen: false }))}
+      />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        message={alertModal.message}
+        onClose={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </motion.div>
   );
 };
