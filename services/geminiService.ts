@@ -13,6 +13,27 @@ export const generateSpeech = async (text: string): Promise<string | null> => {
   return null;
 };
 
+export const searchImageOnWikimedia = async (query: string): Promise<string | undefined> => {
+  try {
+    const res = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrnamespace=6&gsrlimit=5&prop=imageinfo&iiprop=url&format=json&origin=*`);
+    const data = await res.json();
+    if (data.query && data.query.pages) {
+      const pages = Object.values(data.query.pages) as any[];
+      for (const page of pages) {
+        if (page.imageinfo && page.imageinfo[0] && page.imageinfo[0].url) {
+          const url = page.imageinfo[0].url;
+          if (url.match(/\.(jpeg|jpg|gif|png|svg)$/i)) {
+            return url;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Failed to search image on Wikimedia", e);
+  }
+  return undefined;
+};
+
 const callGemini = async (prompt: string, systemInstruction: string, responseSchema?: any) => {
   const apiKey = process.env.OPENROUTER_API_KEY || import.meta.env.VITE_OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("Chave de API do OpenRouter não configurada.");
@@ -256,7 +277,7 @@ export const generateQuiz = async (
     Diretrizes Gerais:
     - Certifique-se de que as perguntas sejam claras, as opções sejam plausíveis e a explicação seja útil.
     - O título do quiz deve ser criativo e relacionado ao tópico.
-    ${config.searchMedia ? "- Busque e inclua URLs reais de imagens (ex: Unsplash, Wikimedia) no campo 'image' e URLs de vídeos (ex: YouTube) no campo 'video' para ilustrar os enunciados das perguntas sempre que fizer sentido." : ""}
+    ${config.searchMedia ? "- Se quiser incluir uma imagem real para ilustrar a pergunta, defina o campo 'image' com o valor exato '[SEARCH: termo de busca em inglês]'. O sistema buscará a imagem automaticamente. NÃO invente URLs de imagens. Para vídeos, se souber a URL exata de um vídeo real do YouTube, pode incluir no campo 'video', caso contrário deixe vazio." : ""}
     ${config.generateImages ? "- Se você não encontrar uma URL real ou se preferir uma imagem gerada por IA, defina o campo 'image' com o valor exato '[GENERATE]'. Você também pode usar '[GENERATE]' nos arrays 'optionImages' ou nos campos 'leftImage' e 'rightImage' dos pares." : ""}
     ${!config.searchMedia && !config.generateImages ? "- NÃO inclua imagens ou vídeos nas perguntas (deixe os campos 'image', 'video', 'optionImages', 'leftImage' e 'rightImage' vazios)." : ""}
   `;
@@ -323,6 +344,9 @@ export const generateQuiz = async (
                   console.error("Failed to generate question image", e);
                   q.image = undefined;
               }
+          } else if (q.image && q.image.startsWith('[SEARCH:')) {
+              const query = q.image.replace('[SEARCH:', '').replace(']', '').trim();
+              q.image = await searchImageOnWikimedia(query) || undefined;
           }
           
           if (q.type === 'MULTIPLE_CHOICE' && q.optionImages) {
@@ -334,6 +358,9 @@ export const generateQuiz = async (
                           console.error("Failed to generate option image", e);
                           return undefined;
                       }
+                  } else if (img && img.startsWith('[SEARCH:')) {
+                      const query = img.replace('[SEARCH:', '').replace(']', '').trim();
+                      return await searchImageOnWikimedia(query) || undefined;
                   }
                   return img || undefined;
               }));
@@ -351,6 +378,9 @@ export const generateQuiz = async (
                           console.error("Failed to generate left pair image", e);
                           pair.leftImage = undefined;
                       }
+                  } else if (pair.leftImage && pair.leftImage.startsWith('[SEARCH:')) {
+                      const query = pair.leftImage.replace('[SEARCH:', '').replace(']', '').trim();
+                      pair.leftImage = await searchImageOnWikimedia(query) || undefined;
                   }
                   
                   if (pair.rightImage === '[GENERATE]') {
@@ -360,6 +390,9 @@ export const generateQuiz = async (
                           console.error("Failed to generate right pair image", e);
                           pair.rightImage = undefined;
                       }
+                  } else if (pair.rightImage && pair.rightImage.startsWith('[SEARCH:')) {
+                      const query = pair.rightImage.replace('[SEARCH:', '').replace(']', '').trim();
+                      pair.rightImage = await searchImageOnWikimedia(query) || undefined;
                   }
               }));
           }

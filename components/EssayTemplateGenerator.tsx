@@ -295,7 +295,7 @@ export const EssayTemplateGenerator: React.FC<EssayTemplateGeneratorProps> = ({ 
                 <label className="block text-sm font-medium text-slate-700">
                     {textualGenre.toLowerCase().includes('dissertativo-argumentativo') ? 'Tema da Redação' : 'Título'}
                 </label>
-                <div className="flex gap-2 tour-topic">
+                <div className="flex flex-col sm:flex-row gap-2 tour-topic">
                     <input 
                         type="text" 
                         value={topic}

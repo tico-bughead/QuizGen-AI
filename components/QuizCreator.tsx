@@ -373,16 +373,16 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
       animate={{ opacity: 1, y: 0 }}
       className="max-w-4xl mx-auto w-full bg-white rounded-[2.5rem] shadow-xl overflow-hidden border border-slate-100"
     >
-      <div className="bg-indigo-600 p-8 text-white flex items-center justify-between">
+      <div className="bg-indigo-600 p-6 sm:p-8 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <button onClick={onCancel} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+          <button onClick={onCancel} className="p-2 hover:bg-white/10 rounded-full transition-colors shrink-0">
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h2 className="text-2xl font-bold">Criar Novo Quiz</h2>
+          <h2 className="text-xl sm:text-2xl font-bold">Criar Novo Quiz</h2>
         </div>
         <Button 
           onClick={handleSave} 
-          className="bg-white text-black hover:bg-indigo-50 border-indigo-600 shadow-none tour-save"
+          className="bg-white text-black hover:bg-indigo-50 border-indigo-600 shadow-none tour-save w-full sm:w-auto"
           icon={<Save className="w-5 h-5" />}
         >
           Salvar e Jogar
@@ -505,10 +505,10 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                 />
                                 <div className="flex gap-2 items-center">
                                     {q.image || q.video ? (
-                                        <div className="flex gap-4">
+                                        <div className="flex flex-wrap gap-4">
                                             {q.image && (
                                                 <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 group/img">
-                                                    <img src={q.image} alt="Question" className="w-full h-full object-cover" />
+                                                    <img src={q.image} alt="Question" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                                     <button 
                                                         onClick={() => handleQuestionChange(qIndex, 'image', undefined)}
                                                         className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity text-white"
@@ -541,7 +541,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                             )}
                                         </div>
                                     ) : (
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-wrap gap-2">
                                             <label className="text-xs flex items-center gap-1 text-slate-600 bg-slate-50 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200 font-medium">
                                                 <ImageIcon className="w-4 h-4" />
                                                 Subir Imagem
@@ -598,7 +598,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                             </label>
                                             <button
                                                 onClick={() => {
-                                                    const url = window.prompt("Cole o link do vídeo (YouTube, Vimeo, etc):");
+                                                    const url = window.prompt("Cole o link do vídeo (Ex: YouTube, Shorts, MP4):");
                                                     if (url) {
                                                         handleQuestionChange(qIndex, 'video', url);
                                                     }
@@ -676,7 +676,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                     </div>
                                     {q.optionImages?.[oIndex] && (
                                         <div className="ml-8 relative w-full h-32 rounded-lg overflow-hidden border border-slate-200 group/img">
-                                            <img src={q.optionImages[oIndex]} alt={`Option ${oIndex + 1}`} className="w-full h-full object-cover" />
+                                            <img src={q.optionImages[oIndex]} alt={`Option ${oIndex + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                             <button 
                                                 onClick={() => handleRemoveOptionImage(qIndex, oIndex)}
                                                 className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity text-white"
@@ -742,7 +742,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                  <div className="flex gap-2 items-center">
                                                     {pair.leftImage ? (
                                                         <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group/img">
-                                                            <img src={pair.leftImage} alt="Left" className="w-full h-full object-cover" />
+                                                            <img src={pair.leftImage} alt="Left" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                                             <button 
                                                                 onClick={() => {
                                                                     const newQuestions = [...questions];
@@ -811,7 +811,7 @@ export const QuizCreator: React.FC<QuizCreatorProps> = ({ onSave, onCancel }) =>
                                                  <div className="flex gap-2 items-center">
                                                     {pair.rightImage ? (
                                                         <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group/img">
-                                                            <img src={pair.rightImage} alt="Right" className="w-full h-full object-cover" />
+                                                            <img src={pair.rightImage} alt="Right" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                                             <button 
                                                                 onClick={() => {
                                                                     const newQuestions = [...questions];

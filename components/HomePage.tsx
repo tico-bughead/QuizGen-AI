@@ -158,30 +158,30 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onCreate, onEssayGe
         transition={{ delay: 0.6 }}
         className="flex flex-col sm:flex-row gap-4 justify-center"
       >
-        <div className="tour-generate-ai">
+        <div className="tour-generate-ai w-full sm:w-auto">
           <Button 
             onClick={onStart} 
-            className="py-4 px-12 text-xl shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/40 w-full"
+            className="py-4 px-6 sm:px-12 text-lg sm:text-xl shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/40 w-full"
             icon={<Sparkles className="w-6 h-6" />}
           >
             Gerar com IA
           </Button>
         </div>
-        <div className="tour-create-manual">
+        <div className="tour-create-manual w-full sm:w-auto">
           <Button 
             onClick={onCreate} 
             variant="outline"
-            className="py-4 px-12 text-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 shadow-lg w-full"
+            className="py-4 px-6 sm:px-12 text-lg sm:text-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 shadow-lg w-full"
             icon={<BrainCircuit className="w-6 h-6" />}
           >
             Criar Quiz
           </Button>
         </div>
-        <div className="tour-essay-models">
+        <div className="tour-essay-models w-full sm:w-auto">
           <Button 
             onClick={onEssayGenerator} 
             variant="outline"
-            className="py-4 px-12 text-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 shadow-lg w-full"
+            className="py-4 px-6 sm:px-12 text-lg sm:text-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 shadow-lg w-full"
             icon={<PenTool className="w-6 h-6" />}
           >
             Modelos de Redação

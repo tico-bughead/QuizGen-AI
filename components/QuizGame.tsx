@@ -1179,7 +1179,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                     </div>
                 )}
                 {question.image && (
-                    <img src={question.image} alt="Question" className="w-full max-w-md h-48 sm:h-64 object-cover rounded-2xl shadow-lg border-4 border-white/20" />
+                    <img src={question.image} alt="Question" className="w-full max-w-md h-48 sm:h-64 object-cover rounded-2xl shadow-lg border-4 border-white/20" referrerPolicy="no-referrer" />
                 )}
                 <div className="flex items-center gap-2">
                     {question.text}
@@ -1233,7 +1233,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                                   }`}
                                 >
                                     {pair.leftImage && (
-                                        <img src={pair.leftImage} alt="Item" className="w-full h-32 object-cover rounded-xl" />
+                                        <img src={pair.leftImage} alt="Item" className="w-full h-32 object-cover rounded-xl" referrerPolicy="no-referrer" />
                                     )}
                                     <span className="text-center font-medium">{pair.left}</span>
                                 </button>
@@ -1256,7 +1256,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                                   }`}
                                 >
                                     {pair?.rightImage && (
-                                        <img src={pair.rightImage} alt="Match" className="w-full h-32 object-cover rounded-xl" />
+                                        <img src={pair.rightImage} alt="Match" className="w-full h-32 object-cover rounded-xl" referrerPolicy="no-referrer" />
                                     )}
                                     <span className="text-center font-medium">{text}</span>
                                 </button>
@@ -1553,7 +1553,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({ quiz, onComplete }) => {
                         </div>
                         <div className="flex flex-col items-start w-full min-w-0">
                             {question.optionImages?.[index] && (
-                                <img src={question.optionImages[index]} alt="Option" className="w-full h-32 object-cover rounded-xl mb-3 border border-black/10" />
+                                <img src={question.optionImages[index]} alt="Option" className="w-full h-32 object-cover rounded-xl mb-3 border border-black/10" referrerPolicy="no-referrer" />
                             )}
                             <span className={`${styles.optionText} font-medium break-words w-full`}>
                                 {option}
