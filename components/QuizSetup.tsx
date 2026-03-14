@@ -97,7 +97,8 @@ export const QuizSetup: React.FC<QuizSetupProps> = ({ onStart, isGenerating }) =
     summer: 'Verão',
     autumn: 'Outono',
     winter: 'Inverno',
-    spring: 'Primavera'
+    spring: 'Primavera',
+    random: 'Aleatório'
   };
 
   const Tooltip: React.FC<{ id: string; text: string }> = ({ id, text }) => (
